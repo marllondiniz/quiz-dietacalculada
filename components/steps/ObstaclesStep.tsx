@@ -34,10 +34,10 @@ export default function ObstaclesStep() {
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="px-6 pt-4">
-        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-2 leading-tight max-w-md mx-auto">
+        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-2 leading-tight max-w-md mx-auto text-center">
           O que está te impedindo?
         </h1>
-        <p className="text-[15px] md:text-[16px] text-gray-500 max-w-md mx-auto">
+        <p className="text-[15px] md:text-[16px] text-gray-500 max-w-md mx-auto text-center">
           Selecione todas que se aplicam
         </p>
       </div>

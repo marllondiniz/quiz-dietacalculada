@@ -21,6 +21,8 @@ export interface QuizAnswers {
   heightCm?: number;
   weightLb?: number;
   weightKg?: number;
+  desiredWeightKg?: number;
+  weightSpeedPerWeek?: number;
   addBurnedCalories?: boolean;
   transferExtraCalories?: boolean;
 }
@@ -41,7 +43,7 @@ const initialAnswers: QuizAnswers = {};
 export const useQuizStore = create<QuizStore>((set) => ({
   currentStep: 0,
   answers: initialAnswers,
-  totalSteps: 13,
+  totalSteps: 23,
   setCurrentStep: (step) => set({ currentStep: step }),
   updateAnswer: (key, value) =>
     set((state) => ({

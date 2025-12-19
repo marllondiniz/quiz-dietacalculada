@@ -28,10 +28,10 @@ export default function GenderStep() {
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="px-6 pt-4">
-        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-2 leading-tight max-w-md mx-auto">
+        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-2 leading-tight max-w-md mx-auto text-center">
           Escolha seu gênero
         </h1>
-        <p className="text-[15px] md:text-[16px] text-gray-500 max-w-md mx-auto leading-relaxed">
+        <p className="text-[15px] md:text-[16px] text-gray-500 max-w-md mx-auto leading-relaxed text-center">
           Isso será usado para calibrar seu plano personalizado.
         </p>
       </div>

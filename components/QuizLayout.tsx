@@ -1,7 +1,9 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import ProgressBar from './ProgressBar';
 import { useQuizStore } from '@/store/quizStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 interface QuizLayoutProps {
   children: React.ReactNode;
@@ -14,6 +16,23 @@ export default function QuizLayout({
 }: QuizLayoutProps) {
   const { currentStep, totalSteps, previousStep } = useQuizStore();
   const router = useRouter();
+  const params = useParams();
+  const stepFromUrl = parseInt(params.step as string, 10);
+  
+  const [isAnimating, setIsAnimating] = useState(true);
+  const [animationKey, setAnimationKey] = useState(stepFromUrl);
+
+  // Reset animation when step changes
+  useEffect(() => {
+    setIsAnimating(false);
+    // Small delay to reset animation
+    const timeout = setTimeout(() => {
+      setAnimationKey(stepFromUrl);
+      setIsAnimating(true);
+    }, 50);
+    
+    return () => clearTimeout(timeout);
+  }, [stepFromUrl]);
 
   const handleBack = () => {
     previousStep();
@@ -28,7 +47,7 @@ export default function QuizLayout({
           {showBackButton ? (
             <button
               onClick={handleBack}
-              className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-all duration-200"
+              className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-all duration-200 active:scale-95"
               aria-label="Voltar"
             >
               <svg
@@ -54,11 +73,22 @@ export default function QuizLayout({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content with animation */}
       <div className="flex-1 overflow-hidden">
-        {children}
+        <div 
+          key={animationKey}
+          className={`h-full transition-all duration-300 ${
+            isAnimating 
+              ? 'opacity-100 translate-x-0' 
+              : 'opacity-0 translate-x-4'
+          }`}
+          style={{
+            animation: isAnimating ? 'pageEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'none'
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
 }
-

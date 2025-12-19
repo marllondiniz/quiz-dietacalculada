@@ -28,7 +28,7 @@ export default function GoalStep() {
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="px-6 pt-4">
-        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-3 leading-tight max-w-md mx-auto">
+        <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-3 leading-tight max-w-md mx-auto text-center">
           Qual é o seu objetivo?
         </h1>
       </div>

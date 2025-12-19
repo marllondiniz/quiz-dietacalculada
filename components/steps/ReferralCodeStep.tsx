@@ -26,10 +26,10 @@ export default function ReferralCodeStep() {
     <div className="fixed inset-0 flex flex-col bg-white">
       {/* Header */}
       <div className="px-6 pt-4">
-        <h1 className="text-[26px] md:text-[32px] font-bold text-black mb-2 leading-tight max-w-2xl mx-auto">
+        <h1 className="text-[26px] md:text-[32px] font-bold text-black mb-2 leading-tight max-w-2xl mx-auto text-center">
           Código de referência
         </h1>
-        <p className="text-gray-500 text-[15px] md:text-base max-w-2xl mx-auto">
+        <p className="text-gray-500 text-[15px] md:text-base max-w-2xl mx-auto text-center">
           Tem um código? Use-o para desbloquear benefícios
         </p>
       </div>
