@@ -244,40 +244,69 @@ input[type="range"] {
   appearance: none;
   background: transparent;
   cursor: pointer;
+  width: 100%;
+  height: 8px;
 }
 
-/* Webkit (Chrome, Safari, Edge) */
+/* Webkit (Chrome, Safari, Edge) - Thumb (bolinha) */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 40px;
-  height: 40px;
-  background: transparent;
+  width: 24px;
+  height: 24px;
+  background: #1a1a1a;
   cursor: pointer;
   border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
   -webkit-appearance: none;
   appearance: none;
-  height: 100%;
+  height: 8px;
   background: transparent;
+  border-radius: 4px;
 }
 
-/* Firefox */
+/* Firefox - Thumb (bolinha) */
 input[type="range"]::-moz-range-thumb {
-  width: 40px;
-  height: 40px;
-  background: transparent;
+  width: 24px;
+  height: 24px;
+  background: #1a1a1a;
   cursor: pointer;
-  border: none;
+  border: 3px solid #ffffff;
   border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 input[type="range"]::-moz-range-track {
-  height: 100%;
+  height: 8px;
   background: transparent;
   border: none;
+  border-radius: 4px;
 }
 
 /* Focus states */
@@ -286,11 +315,11 @@ input[type="range"]:focus {
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.1), 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 input[type="range"]:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 4px rgba(26, 26, 26, 0.1), 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .animate-pulse-subtle {

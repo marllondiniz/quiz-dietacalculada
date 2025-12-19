@@ -2,10 +2,20 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import { useEffect, useState } from 'react';
 
 export default function ComparisonStep() {
   const router = useRouter();
   const { nextStep, currentStep } = useQuizStore();
+  const [animate, setAnimate] = useState(false);
+
+  useEffect(() => {
+    // Trigger animation after component mounts
+    const timer = setTimeout(() => {
+      setAnimate(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleContinue = () => {
     nextStep();
@@ -17,7 +27,7 @@ export default function ComparisonStep() {
       {/* Header */}
       <div className="px-6 pt-4">
         <h1 className="text-[32px] md:text-[40px] font-bold text-black mb-3 leading-tight max-w-md mx-auto text-center">
-          Com Dieta Calculada você perde 2x mais peso do que sozinho
+          87% de sucesso com Dieta Calculada
         </h1>
       </div>
 
@@ -26,43 +36,78 @@ export default function ComparisonStep() {
         <div className="max-w-md mx-auto w-full">
           
           {/* Card de comparação */}
-          <div className="bg-[#f5f5f5] rounded-[24px] p-6 md:p-8">
+          <div className="bg-gradient-to-br from-[#f8f9fa] to-[#f0f1f3] rounded-[28px] p-8 md:p-10 shadow-lg">
             
             {/* Barras de comparação */}
-            <div className="flex justify-center gap-6 mb-6">
+            <div className="flex justify-center gap-8 md:gap-12 mb-8">
               
               {/* Sem Dieta Calculada */}
               <div className="flex flex-col items-center">
-                <p className="text-[14px] md:text-[15px] font-semibold text-black mb-4 text-center">
+                <p className="text-[15px] md:text-[16px] font-bold text-gray-700 mb-5 text-center leading-tight">
                   Sem<br />Dieta Calculada
                 </p>
-                <div className="w-24 md:w-28 h-48 md:h-56 bg-white rounded-[16px] flex flex-col justify-end overflow-hidden">
-                  {/* Barra cinza - 20% */}
-                  <div className="bg-[#e5e5e5] h-[40%] rounded-b-[16px] flex items-center justify-center">
-                    <span className="text-[18px] md:text-[20px] font-bold text-gray-600">20%</span>
+                <div className="relative w-28 md:w-32 h-56 md:h-64 bg-white rounded-[20px] flex flex-col justify-end overflow-hidden shadow-md border border-gray-200">
+                  {/* Barra cinza - 35% de progresso */}
+                  <div 
+                    className="bg-gradient-to-t from-[#d1d5db] to-[#e5e7eb] rounded-b-[20px] flex flex-col items-center justify-center transition-all duration-1200 ease-out relative"
+                    style={{
+                      height: animate ? '35%' : '0%',
+                    }}
+                  >
+                    <span 
+                      className={`text-[28px] md:text-[32px] font-bold text-gray-600 transition-opacity duration-500 ${animate ? 'opacity-100' : 'opacity-0'}`}
+                      style={{ transitionDelay: '900ms' }}
+                    >
+                      35%
+                    </span>
+                    {/* Efeito de brilho */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/20 to-transparent opacity-50" />
                   </div>
                 </div>
+                <p className="text-[13px] md:text-[14px] text-gray-500 mt-3 font-medium">Taxa de sucesso</p>
               </div>
 
               {/* Com Dieta Calculada */}
               <div className="flex flex-col items-center">
-                <p className="text-[14px] md:text-[15px] font-semibold text-black mb-4 text-center">
+                <p className="text-[15px] md:text-[16px] font-bold text-black mb-5 text-center leading-tight">
                   Com<br />Dieta Calculada
                 </p>
-                <div className="w-24 md:w-28 h-48 md:h-56 bg-white rounded-[16px] flex flex-col justify-end overflow-hidden border-2 border-black">
-                  {/* Barra preta - 2X */}
-                  <div className="bg-[#1a1a1a] h-[75%] rounded-b-[14px] flex items-center justify-center">
-                    <span className="text-[18px] md:text-[20px] font-bold text-white">2X</span>
+                <div className="relative w-28 md:w-32 h-56 md:h-64 bg-white rounded-[20px] flex flex-col justify-end overflow-hidden shadow-xl border-2 border-black">
+                  {/* Barra preta - 87% de progresso */}
+                  <div 
+                    className="bg-gradient-to-t from-black via-[#1a1a1a] to-[#2a2a2a] rounded-b-[18px] flex flex-col items-center justify-center transition-all duration-1200 ease-out relative overflow-hidden"
+                    style={{
+                      height: animate ? '87%' : '0%',
+                    }}
+                  >
+                    <span 
+                      className={`text-[36px] md:text-[40px] font-bold text-white transition-opacity duration-500 relative z-10 ${animate ? 'opacity-100' : 'opacity-0'}`}
+                      style={{ transitionDelay: '900ms' }}
+                    >
+                      87%
+                    </span>
+                    {/* Efeito de brilho animado */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/10 to-transparent opacity-50" />
+                    <div 
+                      className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transition-all duration-1000 ${animate ? 'translate-x-full' : '-translate-x-full'}`}
+                      style={{ transitionDelay: '1200ms' }}
+                    />
                   </div>
                 </div>
+                <p className="text-[13px] md:text-[14px] text-black mt-3 font-bold">Taxa de sucesso</p>
               </div>
 
             </div>
 
-            {/* Texto explicativo */}
-            <p className="text-[15px] md:text-[16px] text-gray-500 text-center leading-relaxed">
-              Dieta Calculada facilita o processo e<br />mantém você responsável pelos resultados
-            </p>
+            {/* Texto explicativo com ícone */}
+            <div className="bg-white/60 rounded-[20px] p-5 backdrop-blur-sm border border-green-100">
+              <div className="flex items-start gap-3 justify-center">
+                <span className="text-[20px] flex-shrink-0 mt-0.5">✅</span>
+                <p className="text-[15px] md:text-[16px] text-gray-700 text-center leading-relaxed font-medium">
+                  Plano personalizado + acompanhamento profissional =<br /><span className="text-black font-bold">2.5x mais chances de alcançar seu objetivo</span>
+                </p>
+              </div>
+            </div>
 
           </div>
 

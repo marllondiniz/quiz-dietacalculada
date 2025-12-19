@@ -75,19 +75,23 @@ export default function HeightWeightStep() {
             </div>
 
             {/* Slider */}
-            <div className="mt-5">
-              <input
-                type="range"
-                min="120"
-                max="240"
-                value={heightCm}
-                onChange={(e) => setHeightCm(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-300 rounded-full appearance-none cursor-pointer accent-black"
-                style={{
-                  background: `linear-gradient(to right, #1a1a1a 0%, #1a1a1a ${((heightCm - 120) / 120) * 100}%, #d1d5db ${((heightCm - 120) / 120) * 100}%, #d1d5db 100%)`
-                }}
-              />
-              <div className="flex justify-between mt-2 text-[12px] text-gray-400">
+            <div className="mt-5 px-2">
+              <div className="relative py-3">
+                <input
+                  type="range"
+                  min="120"
+                  max="240"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(parseInt(e.target.value))}
+                  className="w-full appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #1a1a1a 0%, #1a1a1a ${((heightCm - 120) / 120) * 100}%, #d1d5db ${((heightCm - 120) / 120) * 100}%, #d1d5db 100%)`,
+                    height: '8px',
+                    borderRadius: '4px'
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[12px] text-gray-400">
                 <span>120 cm</span>
                 <span>240 cm</span>
               </div>
@@ -129,19 +133,23 @@ export default function HeightWeightStep() {
             </div>
 
             {/* Slider */}
-            <div className="mt-5">
-              <input
-                type="range"
-                min="30"
-                max="200"
-                value={weightKg}
-                onChange={(e) => setWeightKg(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-300 rounded-full appearance-none cursor-pointer accent-black"
-                style={{
-                  background: `linear-gradient(to right, #1a1a1a 0%, #1a1a1a ${((weightKg - 30) / 170) * 100}%, #d1d5db ${((weightKg - 30) / 170) * 100}%, #d1d5db 100%)`
-                }}
-              />
-              <div className="flex justify-between mt-2 text-[12px] text-gray-400">
+            <div className="mt-5 px-2">
+              <div className="relative py-3">
+                <input
+                  type="range"
+                  min="30"
+                  max="200"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(parseInt(e.target.value))}
+                  className="w-full appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #1a1a1a 0%, #1a1a1a ${((weightKg - 30) / 170) * 100}%, #d1d5db ${((weightKg - 30) / 170) * 100}%, #d1d5db 100%)`,
+                    height: '8px',
+                    borderRadius: '4px'
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[12px] text-gray-400">
                 <span>30 kg</span>
                 <span>200 kg</span>
               </div>
