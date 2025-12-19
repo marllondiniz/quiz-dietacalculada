@@ -18,7 +18,7 @@ export default function ThankYouStep() {
               <img 
                 src="/cropped-principal.png" 
                 alt="Dieta Calculada" 
-                className="w-20 h-20 md:w-24 md:h-24 object-contain"
+                className="w-32 h-32 md:w-40 md:h-40 object-contain"
               />
             </div>
             

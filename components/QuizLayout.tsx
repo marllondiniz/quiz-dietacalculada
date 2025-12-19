@@ -78,7 +78,7 @@ export default function QuizLayout({
           )}
           
           {/* Logo */}
-          <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0">
+          <div className="w-12 h-12 md:w-14 md:h-14 flex-shrink-0">
             <img 
               src="/cropped-principal.png" 
               alt="Dieta Calculada" 
