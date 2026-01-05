@@ -60,41 +60,67 @@ export async function POST(request: NextRequest) {
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetId = spreadsheet.data.sheets?.[0]?.properties?.sheetId || 0;
 
-    // Primeiro, inserir apenas os cabeçalhos
+    // Primeiro, limpar a linha 1 e inserir cabeçalhos
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: '1:1',
+    });
+
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'A1:AE1',
+      range: 'A1',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: headers,
       },
     });
 
-    // Depois, formatar em lote
+    // Depois, formatar tudo perfeitamente
     const requests = [
-      // 1. Formatar cabeçalhos
+      // 1. Formatar linha de cabeçalho (A1:AE1)
       {
         repeatCell: {
           range: {
             sheetId,
             startRowIndex: 0,
             endRowIndex: 1,
+            startColumnIndex: 0,
+            endColumnIndex: 31,
           },
           cell: {
             userEnteredFormat: {
-              backgroundColor: { red: 0.2, green: 0.2, blue: 0.2 },
+              backgroundColor: { red: 0.13, green: 0.13, blue: 0.13 }, // Cinza escuro
               textFormat: {
-                foregroundColor: { red: 1, green: 1, blue: 1 },
+                foregroundColor: { red: 1, green: 1, blue: 1 }, // Branco
                 fontSize: 11,
                 bold: true,
               },
               horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
             },
           },
-          fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+          fields: 'userEnteredFormat',
         },
       },
-      // 2. Congelar linha de cabeçalho
+      
+      // 2. Ajustar altura da linha de cabeçalho
+      {
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'ROWS',
+            startIndex: 0,
+            endIndex: 1,
+          },
+          properties: {
+            pixelSize: 50,
+          },
+          fields: 'pixelSize',
+        },
+      },
+
+      // 3. Congelar linha de cabeçalho
       {
         updateSheetProperties: {
           properties: {
@@ -104,6 +130,101 @@ export async function POST(request: NextRequest) {
             },
           },
           fields: 'gridProperties.frozenRowCount',
+        },
+      },
+
+      // 4. Ajustar larguras das colunas principais
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, // Data/Hora
+          properties: { pixelSize: 150 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, // Nome
+          properties: { pixelSize: 180 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, // Email
+          properties: { pixelSize: 220 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 }, // Telefone
+          properties: { pixelSize: 140 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 4, endIndex: 20 }, // Colunas de dados
+          properties: { pixelSize: 120 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 20, endIndex: 31 }, // UTMs e tracking
+          properties: { pixelSize: 150 },
+          fields: 'pixelSize',
+        },
+      },
+
+      // 5. Formatar células de dados com linhas alternadas (zebrado)
+      {
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: 1,
+            startColumnIndex: 0,
+            endColumnIndex: 31,
+          },
+          cell: {
+            userEnteredFormat: {
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'CLIP',
+            },
+          },
+          fields: 'userEnteredFormat(verticalAlignment,wrapStrategy)',
+        },
+      },
+
+      // 6. Adicionar bordas ao cabeçalho
+      {
+        updateBorders: {
+          range: {
+            sheetId,
+            startRowIndex: 0,
+            endRowIndex: 1,
+            startColumnIndex: 0,
+            endColumnIndex: 31,
+          },
+          bottom: {
+            style: 'SOLID',
+            width: 2,
+            color: { red: 0, green: 0, blue: 0 },
+          },
+        },
+      },
+
+      // 7. Habilitar filtros
+      {
+        setBasicFilter: {
+          filter: {
+            range: {
+              sheetId,
+              startRowIndex: 0,
+              startColumnIndex: 0,
+              endColumnIndex: 31,
+            },
+          },
         },
       },
     ];
