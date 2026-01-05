@@ -60,36 +60,38 @@ export async function POST(request: NextRequest) {
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetId = spreadsheet.data.sheets?.[0]?.properties?.sheetId || 0;
 
-    // Batch de requisições para formatar tudo de uma vez
+    // Primeiro, inserir apenas os cabeçalhos
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'A1:AE1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: headers,
+      },
+    });
+
+    // Depois, formatar em lote
     const requests = [
-      // 1. Adicionar cabeçalhos na linha 1
+      // 1. Formatar cabeçalhos
       {
-        updateCells: {
+        repeatCell: {
           range: {
             sheetId,
             startRowIndex: 0,
             endRowIndex: 1,
-            startColumnIndex: 0,
-            endColumnIndex: headers[0].length,
           },
-          rows: [
-            {
-              values: headers[0].map(header => ({
-                userEnteredValue: { stringValue: header },
-                userEnteredFormat: {
-                  backgroundColor: { red: 0.2, green: 0.2, blue: 0.2 },
-                  textFormat: {
-                    foregroundColor: { red: 1, green: 1, blue: 1 },
-                    fontSize: 11,
-                    bold: true,
-                  },
-                  horizontalAlignment: 'CENTER',
-                  verticalAlignment: 'MIDDLE',
-                },
-              })),
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.2, green: 0.2, blue: 0.2 },
+              textFormat: {
+                foregroundColor: { red: 1, green: 1, blue: 1 },
+                fontSize: 11,
+                bold: true,
+              },
+              horizontalAlignment: 'CENTER',
             },
-          ],
-          fields: 'userEnteredValue,userEnteredFormat',
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
         },
       },
       // 2. Congelar linha de cabeçalho
@@ -102,116 +104,6 @@ export async function POST(request: NextRequest) {
             },
           },
           fields: 'gridProperties.frozenRowCount',
-        },
-      },
-      // 3. Ajustar altura da linha de cabeçalho
-      {
-        updateDimensionProperties: {
-          range: {
-            sheetId,
-            dimension: 'ROWS',
-            startIndex: 0,
-            endIndex: 1,
-          },
-          properties: {
-            pixelSize: 40,
-          },
-          fields: 'pixelSize',
-        },
-      },
-      // 4. Ajustar largura das colunas principais
-      {
-        updateDimensionProperties: {
-          range: {
-            sheetId,
-            dimension: 'COLUMNS',
-            startIndex: 0, // Data/Hora
-            endIndex: 1,
-          },
-          properties: {
-            pixelSize: 140,
-          },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: {
-            sheetId,
-            dimension: 'COLUMNS',
-            startIndex: 1, // Nome
-            endIndex: 2,
-          },
-          properties: {
-            pixelSize: 150,
-          },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: {
-            sheetId,
-            dimension: 'COLUMNS',
-            startIndex: 2, // Email
-            endIndex: 3,
-          },
-          properties: {
-            pixelSize: 200,
-          },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: {
-            sheetId,
-            dimension: 'COLUMNS',
-            startIndex: 3, // Telefone
-            endIndex: 4,
-          },
-          properties: {
-            pixelSize: 130,
-          },
-          fields: 'pixelSize',
-        },
-      },
-      // 5. Adicionar filtros
-      {
-        setBasicFilter: {
-          filter: {
-            range: {
-              sheetId,
-              startRowIndex: 0,
-              startColumnIndex: 0,
-              endColumnIndex: headers[0].length,
-            },
-          },
-        },
-      },
-      // 6. Formatar células de dados (zebrado)
-      {
-        addConditionalFormatRule: {
-          rule: {
-            ranges: [
-              {
-                sheetId,
-                startRowIndex: 1,
-                startColumnIndex: 0,
-                endColumnIndex: headers[0].length,
-              },
-            ],
-            booleanRule: {
-              condition: {
-                type: 'CUSTOM_FORMULA',
-                values: [{ userEnteredValue: '=MOD(ROW(),2)=0' }],
-              },
-              format: {
-                backgroundColor: { red: 0.95, green: 0.95, blue: 0.95 },
-              },
-            },
-          },
-          index: 0,
         },
       },
     ];
