@@ -7,9 +7,7 @@ type DietHelperOption = 'nao-faco-dieta' | 'seguir-intuicao' | 'montar-propria' 
 
 const dietHelperOptions: { value: DietHelperOption; label: string }[] = [
   { value: 'nao-faco-dieta', label: 'Não faço dieta' },
-  { value: 'seguir-intuicao', label: 'Sigo a intuição' },
-  { value: 'montar-propria', label: 'Gosto de montar minha própria dieta' },
-  { value: 'copiar-dieta', label: 'Copio a dieta de alguém' },
+  { value: 'montar-propria', label: 'Faço do meu jeito' },
   { value: 'plano-online', label: 'Assino um plano online' },
   { value: 'nutricionista-online', label: 'Tenho nutricionista online' },
   { value: 'nutricionista-presencial', label: 'Tenho nutricionista presencial' },

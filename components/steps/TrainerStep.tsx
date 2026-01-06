@@ -7,9 +7,8 @@ type TrainerOption = 'nao-treino' | 'ajuda-academia' | 'montar-proprios' | 'copi
 
 const trainerOptions: { value: TrainerOption; label: string }[] = [
   { value: 'nao-treino', label: 'Não treino' },
-  { value: 'ajuda-academia', label: 'Peço ajuda do profissional da academia' },
-  { value: 'montar-proprios', label: 'Gosto de montar meus próprios treinos' },
-  { value: 'copiar-treino', label: 'Copio o treino de alguém' },
+  { value: 'ajuda-academia', label: 'Treino da academia' },
+  { value: 'montar-proprios', label: 'Faço do meu jeito' },
   { value: 'plano-online', label: 'Assino um plano online' },
   { value: 'personal-online', label: 'Tenho personal online' },
   { value: 'personal-presencial', label: 'Tenho personal presencial' },

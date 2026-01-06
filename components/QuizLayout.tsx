@@ -51,27 +51,27 @@ export default function QuizLayout({
   return (
     <div className="fixed inset-0 bg-white flex flex-col overflow-hidden">
       {/* Header com logo e progress bar */}
-      <div className="flex-shrink-0 px-4 md:px-6 pt-3 md:pt-4 pb-3 z-10">
-        <div className="max-w-md mx-auto">
+      <div className="flex-shrink-0 px-5 md:px-6 pt-6 md:pt-8 pb-5 md:pb-6 z-10 bg-white">
+        <div className="max-w-lg mx-auto">
           {/* Logo centralizada */}
-          <div className="flex justify-center mb-3">
+          <div className="flex justify-center mb-6 md:mb-8">
             <img 
               src="/cropped-principal.png" 
               alt="Dieta Calculada" 
-              className="w-28 h-28 md:w-32 md:h-32 object-contain"
+              className="w-20 h-20 md:w-24 md:h-24 object-contain"
             />
           </div>
           
           {/* Botão voltar e progress bar */}
-          <div className="flex items-center gap-3">
-            {showBackButton ? (
+          <div className="flex items-center gap-4 relative">
+            {showBackButton && (
               <button
                 onClick={handleBack}
-                className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-all duration-200 active:scale-95 flex-shrink-0"
+                className="absolute left-0 w-10 h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
                 aria-label="Voltar"
               >
                 <svg
-                  className="w-5 h-5 md:w-6 md:h-6 text-black"
+                  className="w-5 h-5 text-gray-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -79,16 +79,14 @@ export default function QuizLayout({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     d="M15 19l-7-7 7-7"
                   />
                 </svg>
               </button>
-            ) : (
-              <div className="w-10 md:w-11 flex-shrink-0"></div>
             )}
             
-            <div className="flex-1 min-w-0">
+            <div className={`flex-1 ${showBackButton ? 'pl-14' : ''}`}>
               <ProgressBar current={currentStep + 1} total={totalSteps} />
             </div>
           </div>

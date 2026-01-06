@@ -81,15 +81,6 @@ export default function ThankYouStep() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-6 py-6 md:py-8">
           <div className="max-w-md mx-auto w-full">
-            {/* Logo */}
-            <div className="flex justify-center mb-5">
-              <img 
-                src="/cropped-principal.png" 
-                alt="Dieta Calculada" 
-                className="w-32 h-32 md:w-40 md:h-40 object-contain"
-              />
-            </div>
-            
             {/* Título Principal */}
             <h1 className="text-[28px] md:text-[32px] font-bold text-black mb-3 leading-tight text-center">
               Seu Plano Personalizado está pronto!

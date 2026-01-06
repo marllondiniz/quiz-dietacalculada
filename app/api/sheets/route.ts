@@ -69,9 +69,8 @@ export async function POST(request: NextRequest) {
     // Mapear opção de treinador para texto legível
     const trainerOptionMap: Record<string, string> = {
       'nao-treino': 'Não treino',
-      'ajuda-academia': 'Peço ajuda do profissional da academia',
-      'montar-proprios': 'Gosto de montar meus próprios treinos',
-      'copiar-treino': 'Copio o treino de alguém',
+      'ajuda-academia': 'Treino da academia',
+      'montar-proprios': 'Faço do meu jeito',
       'plano-online': 'Assino um plano online',
       'personal-online': 'Tenho personal online',
       'personal-presencial': 'Tenho personal presencial',
@@ -83,9 +82,7 @@ export async function POST(request: NextRequest) {
     // Mapear opção de auxílio na dieta para texto legível
     const dietHelperOptionMap: Record<string, string> = {
       'nao-faco-dieta': 'Não faço dieta',
-      'seguir-intuicao': 'Sigo a intuição',
-      'montar-propria': 'Gosto de montar minha própria dieta',
-      'copiar-dieta': 'Copio a dieta de alguém',
+      'montar-propria': 'Faço do meu jeito',
       'plano-online': 'Assino um plano online',
       'nutricionista-online': 'Tenho nutricionista online',
       'nutricionista-presencial': 'Tenho nutricionista presencial',

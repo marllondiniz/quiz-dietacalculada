@@ -32,32 +32,56 @@ export default function PlanReadyStep() {
       const today = new Date();
       const birth = new Date(answers.birthDate);
       age = today.getFullYear() - birth.getFullYear();
+      // Ajustar se ainda não fez aniversário este ano
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
     }
 
-    // TMB (Taxa Metabólica Basal) - Fórmula de Mifflin-St Jeor
-    let tmb: number;
+    // 1) BMR (Basal Metabolic Rate) usando Mifflin-St Jeor
+    // Homens: BMR = (10 × peso em kg) + (6.25 × altura em cm) - (5 × idade) + 5
+    // Mulheres: BMR = (10 × peso em kg) + (6.25 × altura em cm) - (5 × idade) - 161
+    let bmr: number;
     if (gender === 'feminino') {
-      tmb = (10 * weight) + (6.25 * heightCm) - (5 * age) - 161;
+      bmr = (10 * weight) + (6.25 * heightCm) - (5 * age) - 161;
     } else {
-      tmb = (10 * weight) + (6.25 * heightCm) - (5 * age) + 5;
+      bmr = (10 * weight) + (6.25 * heightCm) - (5 * age) + 5;
     }
 
-    // Fator de atividade
-    let activityFactor = 1.2;
-    if (workouts === '3-5') activityFactor = 1.55;
-    if (workouts === '6+') activityFactor = 1.725;
-
-    // TDEE (Gasto Energético Total Diário)
-    let tdee = tmb * activityFactor;
-
-    // Ajuste baseado no objetivo
-    if (goal === 'perder') {
-      tdee -= 500;
-    } else if (goal === 'ganhar') {
-      tdee += 300;
+    // 2) Fator de atividade física para calcular TDEE
+    // Sedentário: 1.2 (pouco ou nenhum exercício)
+    // Levemente ativo: 1.375 (exercício leve 1-3 dias/semana)
+    // Moderadamente ativo: 1.55 (exercício moderado 3-5 dias/semana)
+    // Muito ativo: 1.725 (exercício intenso 6-7 dias/semana)
+    // Extremamente ativo: 1.9 (exercício muito intenso, trabalho físico)
+    let activityFactor = 1.2; // Sedentário (0-2 exercícios)
+    if (workouts === '3-5') {
+      activityFactor = 1.55; // Moderadamente ativo
+    } else if (workouts === '6+') {
+      activityFactor = 1.725; // Muito ativo
     }
 
-    const calories = Math.round(tdee);
+    // TDEE (Total Daily Energy Expenditure)
+    const tdee = bmr * activityFactor;
+
+    // 3) Calcular déficit/superávit calórico baseado na meta
+    // Referência: 7.700 kcal = 1 kg de gordura
+    let calorieAdjustment = 0;
+    
+    if (goal === 'perder' && weightSpeed > 0) {
+      // Déficit diário = (kg por semana × 7.700 kcal/kg) ÷ 7 dias
+      const dailyDeficit = (weightSpeed * 7700) / 7;
+      calorieAdjustment = -dailyDeficit;
+    } else if (goal === 'ganhar' && weightSpeed > 0) {
+      // Superávit diário = (kg por semana × 7.700 kcal/kg) ÷ 7 dias
+      const dailySurplus = (weightSpeed * 7700) / 7;
+      calorieAdjustment = dailySurplus;
+    }
+    // Se goal === 'manter', calorieAdjustment permanece 0
+
+    // Calorias finais = TDEE + ajuste (déficit negativo ou superávit positivo)
+    const calories = Math.round(tdee + calorieAdjustment);
     
     // Macronutrientes
     const proteinGrams = Math.round(weight * 1.8);
