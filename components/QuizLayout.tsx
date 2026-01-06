@@ -51,14 +51,14 @@ export default function QuizLayout({
   return (
     <div className="fixed inset-0 bg-white flex flex-col overflow-hidden">
       {/* Header com logo e progress bar */}
-      <div className="flex-shrink-0 px-5 md:px-6 pt-6 md:pt-8 pb-5 md:pb-6 z-10 bg-white">
+      <div className="flex-shrink-0 px-5 md:px-6 pt-3 md:pt-4 pb-3 md:pb-4 z-10 bg-white">
         <div className="max-w-lg mx-auto">
           {/* Logo centralizada */}
-          <div className="flex justify-center mb-6 md:mb-8">
+          <div className="flex justify-center mb-3 md:mb-4">
             <img 
               src="/cropped-principal.png" 
               alt="Dieta Calculada" 
-              className="w-20 h-20 md:w-24 md:h-24 object-contain"
+              className="w-32 h-32 md:w-36 md:h-36 object-contain"
             />
           </div>
           
