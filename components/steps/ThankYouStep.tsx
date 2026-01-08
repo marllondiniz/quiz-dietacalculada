@@ -115,15 +115,15 @@ export default function ThankYouStep() {
     <div className="h-full flex flex-col bg-white">
       {/* Conteúdo com scroll */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-6 md:py-8">
+        <div className="px-5 md:px-6 py-4 md:py-8">
           <div className="max-w-md mx-auto w-full">
             {/* Título Principal */}
-            <h1 className="text-[28px] md:text-[32px] font-bold text-black mb-3 leading-tight text-center">
+            <h1 className="text-[22px] md:text-[32px] font-bold text-black mb-2 md:mb-3 leading-tight text-center">
               Escolha seu plano e comece agora!
             </h1>
             
             {/* Subtítulo */}
-            <p className="text-[14px] md:text-[15px] text-gray-600 mb-6 text-center">
+            <p className="text-[13px] md:text-[15px] text-gray-600 mb-4 md:mb-6 text-center">
               Seu plano personalizado está pronto. Escolha a melhor opção para você:
             </p>
 
@@ -159,74 +159,74 @@ export default function ThankYouStep() {
             )}
 
             {/* Opções de Planos */}
-            <div className="space-y-4 mb-6">
+            <div className="space-y-3 md:space-y-4 mb-4 md:mb-6">
               {/* Plano Anual - RECOMENDADO */}
               <div 
                 onClick={() => setSelectedPlan('annual')}
-                className={`relative bg-[#f9f9f9] rounded-[20px] p-5 cursor-pointer transition-all duration-200 border-2 ${
+                className={`relative bg-[#f9f9f9] rounded-[16px] md:rounded-[20px] p-4 md:p-5 cursor-pointer transition-all duration-200 border-2 ${
                   selectedPlan === 'annual' 
                     ? 'border-[#FF911A] shadow-lg' 
                     : 'border-transparent hover:border-gray-300'
                 }`}
               >
                 {/* Badge Recomendado */}
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-[#FF911A] text-white text-[11px] font-bold px-4 py-1 rounded-full shadow-md uppercase">
+                <div className="absolute -top-2.5 md:-top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-[#FF911A] text-white text-[10px] md:text-[11px] font-bold px-3 md:px-4 py-0.5 md:py-1 rounded-full shadow-md uppercase">
                     ⭐ Mais Popular
                   </span>
                 </div>
 
                 {/* Radio Button */}
-                <div className="absolute top-5 right-5">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                <div className="absolute top-4 md:top-5 right-4 md:right-5">
+                  <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center ${
                     selectedPlan === 'annual' 
                       ? 'border-[#FF911A] bg-[#FF911A]' 
                       : 'border-gray-300'
                   }`}>
                     {selectedPlan === 'annual' && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <svg width="12" height="12" className="md:w-[14px] md:h-[14px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                         <path d="M5 12l5 5L19 7"/>
                       </svg>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-3">
-                  <h3 className="text-[20px] font-bold text-black mb-2">Plano Anual</h3>
+                <div className="mt-2 md:mt-3">
+                  <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Anual</h3>
                   
-                  <div className="mb-3">
-                    <p className="text-[32px] font-bold text-black leading-none">
+                  <div className="mb-2 md:mb-3">
+                    <p className="text-[26px] md:text-[32px] font-bold text-black leading-none">
                       12x de R$ 10,90
                     </p>
-                    <p className="text-[13px] text-green-600 font-semibold mt-1">
+                    <p className="text-[12px] md:text-[13px] text-green-600 font-semibold mt-1">
                       💰 Economize 70% com o plano anual
                     </p>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 md:space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Acesso completo por 12 meses</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Acesso completo por 12 meses</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Suporte prioritário</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Suporte prioritário</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Todas as atualizações incluídas</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Todas as atualizações incluídas</p>
                     </div>
                   </div>
                 </div>
@@ -235,21 +235,21 @@ export default function ThankYouStep() {
               {/* Plano Mensal */}
               <div 
                 onClick={() => setSelectedPlan('monthly')}
-                className={`relative bg-[#f9f9f9] rounded-[20px] p-5 cursor-pointer transition-all duration-200 border-2 ${
+                className={`relative bg-[#f9f9f9] rounded-[16px] md:rounded-[20px] p-4 md:p-5 cursor-pointer transition-all duration-200 border-2 ${
                   selectedPlan === 'monthly' 
                     ? 'border-[#FF911A] shadow-lg' 
                     : 'border-transparent hover:border-gray-300'
                 }`}
               >
                 {/* Radio Button */}
-                <div className="absolute top-5 right-5">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                <div className="absolute top-4 md:top-5 right-4 md:right-5">
+                  <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center ${
                     selectedPlan === 'monthly' 
                       ? 'border-[#FF911A] bg-[#FF911A]' 
                       : 'border-gray-300'
                   }`}>
                     {selectedPlan === 'monthly' && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <svg width="12" height="12" className="md:w-[14px] md:h-[14px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                         <path d="M5 12l5 5L19 7"/>
                       </svg>
                     )}
@@ -257,41 +257,41 @@ export default function ThankYouStep() {
                 </div>
 
                 <div>
-                  <h3 className="text-[20px] font-bold text-black mb-2">Plano Mensal</h3>
+                  <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Mensal</h3>
                   
-                  <div className="mb-3">
-                    <p className="text-[32px] font-bold text-black leading-none">
-                      R$ 27,90<span className="text-[16px] text-gray-600 font-normal">/mês</span>
+                  <div className="mb-2 md:mb-3">
+                    <p className="text-[26px] md:text-[32px] font-bold text-black leading-none">
+                      R$ 27,90<span className="text-[14px] md:text-[16px] text-gray-600 font-normal">/mês</span>
                     </p>
-                    <p className="text-[13px] text-gray-600 mt-1">
+                    <p className="text-[12px] md:text-[13px] text-gray-600 mt-1">
                       Pagamento mensal recorrente
                     </p>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 md:space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Acesso completo à plataforma</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Acesso completo à plataforma</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Cancele quando quiser</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Cancele quando quiser</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[13px] text-gray-700">Suporte por WhatsApp</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Suporte por WhatsApp</p>
                     </div>
                   </div>
                 </div>
@@ -299,11 +299,11 @@ export default function ThankYouStep() {
             </div>
 
             {/* Garantia */}
-            <div className="bg-green-50 rounded-[14px] p-3.5 text-center mb-4">
-              <p className="text-[13px] md:text-[14px] text-green-800 font-semibold mb-0.5">
+            <div className="bg-green-50 rounded-[12px] md:rounded-[14px] p-2.5 md:p-3.5 text-center mb-3 md:mb-4">
+              <p className="text-[12px] md:text-[14px] text-green-800 font-semibold mb-0.5">
                 🔒 Garantia de 7 dias
               </p>
-              <p className="text-[12px] text-green-700 leading-snug">
+              <p className="text-[11px] md:text-[12px] text-green-700 leading-snug">
                 Se não gostar, devolvemos 100% do seu dinheiro
               </p>
             </div>
@@ -312,16 +312,16 @@ export default function ThankYouStep() {
       </div>
 
       {/* Botão de Checkout fixo */}
-      <div className="flex-shrink-0 px-6 pb-6 md:pb-8 bg-white">
+      <div className="flex-shrink-0 px-5 md:px-6 pb-5 md:pb-8 bg-white">
         <div className="max-w-md mx-auto w-full">
           <button
             onClick={() => handleCheckout(selectedPlan)}
-            className="w-full py-4 md:py-5 px-6 rounded-[14px] font-bold text-[15px] md:text-[16px] transition-all duration-200 bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90 shadow-md uppercase"
+            className="w-full py-3.5 md:py-5 px-5 md:px-6 rounded-[14px] font-bold text-[14px] md:text-[16px] transition-all duration-200 bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90 shadow-md uppercase"
           >
             {selectedPlan === 'annual' ? 'GARANTIR PLANO ANUAL' : 'GARANTIR PLANO MENSAL'}
           </button>
           
-          <p className="text-center text-[11px] md:text-[12px] text-gray-500 mt-2.5">
+          <p className="text-center text-[10px] md:text-[12px] text-gray-500 mt-2">
             🔒 Pagamento 100% seguro • Acesso imediato
           </p>
         </div>

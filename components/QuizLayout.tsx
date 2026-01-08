@@ -51,27 +51,27 @@ export default function QuizLayout({
   return (
     <div className="fixed inset-0 bg-white flex flex-col overflow-hidden">
       {/* Header com logo e progress bar */}
-      <div className="flex-shrink-0 px-5 md:px-6 pt-3 md:pt-4 pb-3 md:pb-4 z-10 bg-white">
+      <div className="flex-shrink-0 px-5 md:px-6 pt-2 md:pt-4 pb-2 md:pb-4 z-10 bg-white">
         <div className="max-w-lg mx-auto">
           {/* Logo centralizada */}
-          <div className="flex justify-center mb-3 md:mb-4">
+          <div className="flex justify-center mb-2 md:mb-4">
             <img 
               src="/cropped-principal.png" 
               alt="Dieta Calculada" 
-              className="w-32 h-32 md:w-36 md:h-36 object-contain"
+              className="w-20 h-20 md:w-36 md:h-36 object-contain"
             />
           </div>
           
           {/* Botão voltar e progress bar */}
-          <div className="flex items-center gap-4 relative">
+          <div className="flex items-center gap-3 md:gap-4 relative">
             {showBackButton && (
               <button
                 onClick={handleBack}
-                className="absolute left-0 w-10 h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
+                className="absolute left-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
                 aria-label="Voltar"
               >
                 <svg
-                  className="w-5 h-5 text-gray-600"
+                  className="w-4 h-4 md:w-5 md:h-5 text-gray-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -86,7 +86,7 @@ export default function QuizLayout({
               </button>
             )}
             
-            <div className={`flex-1 ${showBackButton ? 'pl-14' : ''}`}>
+            <div className={`flex-1 ${showBackButton ? 'pl-11 md:pl-14' : ''}`}>
               <ProgressBar current={currentStep + 1} total={totalSteps} />
             </div>
           </div>
