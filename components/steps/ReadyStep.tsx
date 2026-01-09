@@ -2,6 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useEffect, useState } from 'react';
 
 export default function ReadyStep() {
@@ -10,10 +11,16 @@ export default function ReadyStep() {
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep } = useQuizStore();
   const [isAnimated, setIsAnimated] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsAnimated(true), 100);
-    return () => clearTimeout(timer);
+    // Habilitar botão após 2 segundos (tempo mínimo de leitura)
+    const enableButton = setTimeout(() => setCanContinue(true), 2000);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(enableButton);
+    };
   }, []);
 
   const handleContinue = () => {
@@ -87,12 +94,17 @@ export default function ReadyStep() {
       {/* Botão fixo no bottom */}
       <div className="px-6 pb-6 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
-            className="w-full py-4 md:py-5 px-6 rounded-2xl font-semibold text-[16px] md:text-[17px] transition-all duration-200 bg-[#FF911A] text-white active:scale-[0.98] hover:bg-[#FF911A]/90"
+            disabled={!canContinue}
+            className={`w-full py-4 md:py-5 px-6 rounded-2xl font-semibold text-[16px] md:text-[17px] transition-all duration-200 ${
+              canContinue
+                ? 'bg-[#FF911A] text-white active:scale-[0.98] hover:bg-[#FF911A]/90'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Continuar
-          </button>
+            {canContinue ? 'Continuar' : 'Aguarde...'}
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

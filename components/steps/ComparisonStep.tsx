@@ -2,19 +2,26 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useEffect, useState } from 'react';
 
 export default function ComparisonStep() {
   const router = useRouter();
   const { nextStep, currentStep } = useQuizStore();
   const [animate, setAnimate] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
 
   useEffect(() => {
     // Trigger animation after component mounts
     const timer = setTimeout(() => {
       setAnimate(true);
     }, 300);
-    return () => clearTimeout(timer);
+    // Habilitar botão após 2.5 segundos (tempo para ver a animação)
+    const enableButton = setTimeout(() => setCanContinue(true), 2500);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(enableButton);
+    };
   }, []);
 
   const handleContinue = () => {
@@ -117,12 +124,17 @@ export default function ComparisonStep() {
       {/* Botão fixo no bottom */}
       <div className="px-5 md:px-6 pb-5 md:pb-8 flex-shrink-0">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
-            className="w-full py-3.5 md:py-5 px-6 rounded-[14px] md:rounded-[20px] font-semibold text-[15px] md:text-[17px] transition-all duration-200 bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90"
+            disabled={!canContinue}
+            className={`w-full py-3.5 md:py-5 px-6 rounded-[14px] md:rounded-[20px] font-semibold text-[15px] md:text-[17px] transition-all duration-200 ${
+              canContinue
+                ? 'bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Continuar
-          </button>
+            {canContinue ? 'Continuar' : 'Aguarde...'}
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

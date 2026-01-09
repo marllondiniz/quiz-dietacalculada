@@ -2,6 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useMemo, useEffect, useState } from 'react';
 
 export default function PlanReadyStep() {
@@ -10,10 +11,16 @@ export default function PlanReadyStep() {
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep, answers } = useQuizStore();
   const [isAnimated, setIsAnimated] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsAnimated(true), 300);
-    return () => clearTimeout(timer);
+    // Habilitar botão após 3 segundos (página com cálculos importantes)
+    const enableButton = setTimeout(() => setCanContinue(true), 3000);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(enableButton);
+    };
   }, []);
 
   // Cálculos baseados nas respostas do quiz
@@ -81,12 +88,76 @@ export default function PlanReadyStep() {
     // Se goal === 'manter', calorieAdjustment permanece 0
 
     // Calorias finais = TDEE + ajuste (déficit negativo ou superávit positivo)
-    const calories = Math.round(tdee + calorieAdjustment);
+    let calories = Math.round(tdee + calorieAdjustment);
     
-    // Macronutrientes
-    const proteinGrams = Math.round(weight * 1.8);
-    const fatGrams = Math.round((calories * 0.25) / 9);
-    const carbGrams = Math.round((calories - (proteinGrams * 4) - (fatGrams * 9)) / 4);
+    // Garantir mínimo de calorias para segurança (nunca menos que 1200 kcal)
+    const MIN_CALORIES = 1200;
+    if (calories < MIN_CALORIES) {
+      calories = MIN_CALORIES;
+    }
+    
+    // Macronutrientes com validações e ajustes automáticos
+    // Mínimos recomendados para saúde
+    const MIN_CARBS = 50; // gramas (mínimo absoluto para função cerebral)
+    const MIN_FAT = 30; // gramas (mínimo para hormônios e absorção de vitaminas)
+    
+    // 1. Calcular proteína (1.6-2.0g por kg de peso corporal)
+    let proteinGrams = Math.round(weight * 1.8);
+    
+    // 2. Calcular gordura (20-30% das calorias totais)
+    let fatGrams = Math.round((calories * 0.25) / 9);
+    
+    // Garantir mínimo de gordura
+    if (fatGrams < MIN_FAT) {
+      fatGrams = MIN_FAT;
+    }
+    
+    // 3. Calcular calorias restantes para carboidratos
+    const proteinCalories = proteinGrams * 4;
+    const fatCalories = fatGrams * 9;
+    const remainingCalories = calories - proteinCalories - fatCalories;
+    
+    // 4. Calcular carboidratos com o restante
+    let carbGrams = Math.round(remainingCalories / 4);
+    
+    // 5. VALIDAÇÃO CRÍTICA: Se carboidratos ficarem abaixo do mínimo
+    if (carbGrams < MIN_CARBS) {
+      // Ajustar automaticamente a distribuição de macros
+      console.warn('⚠️ Carboidratos abaixo do mínimo. Ajustando distribuição de macros...');
+      
+      // Garantir mínimo de carboidratos
+      carbGrams = MIN_CARBS;
+      
+      // Recalcular calorias necessárias com os mínimos
+      const minCaloriesNeeded = (proteinGrams * 4) + (fatGrams * 9) + (carbGrams * 4);
+      
+      // Se as calorias atuais não comportam os mínimos, ajustar proteína
+      if (minCaloriesNeeded > calories) {
+        // Reduzir proteína para acomodar carboidratos mínimos
+        const availableForProtein = calories - (fatGrams * 9) - (carbGrams * 4);
+        proteinGrams = Math.max(Math.round(availableForProtein / 4), Math.round(weight * 1.2));
+        
+        console.warn('🔧 Proteína ajustada para:', proteinGrams, 'g');
+      }
+    }
+    
+    // 6. Garantir que a soma dos macros não exceda as calorias totais
+    const totalMacroCalories = (proteinGrams * 4) + (fatGrams * 9) + (carbGrams * 4);
+    if (totalMacroCalories > calories) {
+      // Ajuste fino: reduzir proporcionalmente
+      const ratio = calories / totalMacroCalories;
+      proteinGrams = Math.round(proteinGrams * ratio);
+      fatGrams = Math.max(MIN_FAT, Math.round(fatGrams * ratio));
+      carbGrams = Math.max(MIN_CARBS, Math.round(carbGrams * ratio));
+    }
+    
+    console.log('📊 Macros calculados:', {
+      calories,
+      proteina: proteinGrams + 'g',
+      gordura: fatGrams + 'g',
+      carboidratos: carbGrams + 'g',
+      total: ((proteinGrams * 4) + (fatGrams * 9) + (carbGrams * 4)) + ' kcal'
+    });
 
     // Diferença de peso e data estimada
     const weightDiff = Math.abs(weight - desiredWeight);
@@ -325,12 +396,17 @@ export default function PlanReadyStep() {
       {/* Botão fixo no bottom */}
       <div className="flex-shrink-0 px-6 pb-6 md:pb-8 bg-white">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
-            className="w-full py-4 md:py-5 px-6 rounded-2xl font-semibold text-[16px] md:text-[17px] transition-all duration-200 bg-[#FF911A] text-white active:scale-[0.98] hover:bg-[#FF911A]/90"
+            disabled={!canContinue}
+            className={`w-full py-4 md:py-5 px-6 rounded-2xl font-semibold text-[16px] md:text-[17px] transition-all duration-200 ${
+              canContinue
+                ? 'bg-[#FF911A] text-white active:scale-[0.98] hover:bg-[#FF911A]/90'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Vamos começar! 🚀
-          </button>
+            {canContinue ? 'Vamos começar! 🚀' : 'Calculando...'}
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

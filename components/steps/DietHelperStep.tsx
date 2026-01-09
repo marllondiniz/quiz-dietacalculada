@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 
 type DietHelperOption = 'nao-faco-dieta' | 'seguir-intuicao' | 'montar-propria' | 'copiar-dieta' | 'plano-online' | 'nutricionista-online' | 'nutricionista-presencial';
 
@@ -76,7 +77,7 @@ export default function DietHelperStep() {
       {/* Botão fixo no bottom */}
       <div className="px-5 md:px-6 pb-5 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
             disabled={!answers.dietHelper}
             className={`w-full py-3.5 md:py-5 px-6 rounded-[14px] md:rounded-[20px] font-semibold text-[15px] md:text-[17px] transition-all duration-200 ${
@@ -86,7 +87,7 @@ export default function DietHelperStep() {
             }`}
           >
             Continuar
-          </button>
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

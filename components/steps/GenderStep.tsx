@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 
 const genders = [
   { id: 'masculino', label: 'Masculino' },
@@ -78,7 +79,7 @@ export default function GenderStep() {
       {/* Botão fixo no bottom */}
       <div className="px-5 md:px-6 pb-5 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
             disabled={!answers.gender}
             className={`w-full py-3.5 md:py-5 px-6 rounded-[14px] md:rounded-[20px] font-semibold text-[15px] md:text-[17px] transition-all duration-200 ${
@@ -88,7 +89,7 @@ export default function GenderStep() {
             }`}
           >
             Continuar
-          </button>
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

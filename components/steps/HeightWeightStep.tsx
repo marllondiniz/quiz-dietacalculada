@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import { useState } from 'react';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 
 export default function HeightWeightStep() {
   const router = useRouter();
@@ -162,12 +163,12 @@ export default function HeightWeightStep() {
       {/* Botão fixo no bottom */}
       <div className="px-6 pb-6 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
             className="w-full py-4 md:py-5 px-6 rounded-[16px] md:rounded-[20px] font-semibold text-[16px] md:text-[17px] transition-all duration-200 bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90"
           >
             Continuar
-          </button>
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

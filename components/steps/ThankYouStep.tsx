@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useQuizStore } from '@/store/quizStore';
+import { useQuizStore, type QuizAnswers } from '@/store/quizStore';
 import { useSearchParams } from 'next/navigation';
 
 type PlanType = 'annual' | 'monthly';
@@ -74,15 +74,36 @@ export default function ThankYouStep() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Executar apenas uma vez quando o componente montar
 
-  // Função para construir URL com UTMs
+  // Função para construir URL com UTMs (prioriza store, depois URL, depois sessionStorage)
   const buildCheckoutUrl = (baseUrl: string): string => {
     const utmParams = new URLSearchParams();
     
-    // Capturar todos os parâmetros UTM da URL atual
-    const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    // Capturar todos os parâmetros UTM de múltiplas fontes
+    const utmKeys: Array<keyof QuizAnswers> = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
     
     utmKeys.forEach(key => {
-      const value = searchParams.get(key);
+      // 1. Prioridade: buscar do store (já deve estar salvo)
+      let value: string | undefined = answers[key] as string | undefined;
+      
+      // 2. Se não estiver no store, tentar buscar da URL atual
+      if (!value) {
+        const urlValue = searchParams.get(key.replace('_', '')) || searchParams.get(key);
+        value = urlValue || undefined;
+      }
+      
+      // 3. Se ainda não tiver, tentar recuperar do sessionStorage
+      if (!value) {
+        try {
+          const savedTracking = sessionStorage.getItem('quiz_utm_tracking');
+          if (savedTracking) {
+            const trackingData = JSON.parse(savedTracking);
+            value = trackingData[key] || undefined;
+          }
+        } catch (error) {
+          console.error('Erro ao recuperar UTM do sessionStorage:', error);
+        }
+      }
+      
       if (value) {
         utmParams.append(key, value);
       }
@@ -92,9 +113,11 @@ export default function ThankYouStep() {
     const utmString = utmParams.toString();
     if (utmString) {
       const separator = baseUrl.includes('?') ? '&' : '?';
+      console.log('🔗 URL de checkout com UTMs:', `${baseUrl}${separator}${utmString}`);
       return `${baseUrl}${separator}${utmString}`;
     }
 
+    console.log('⚠️ Nenhuma UTM encontrada para anexar ao checkout');
     return baseUrl;
   };
 

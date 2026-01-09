@@ -78,6 +78,24 @@ export const useQuizStore = create<QuizStore>((set) => ({
     set((state) => ({
       currentStep: Math.max(state.currentStep - 1, 0),
     })),
-  reset: () => set({ currentStep: 0, answers: initialAnswers }),
+  reset: () => set((state) => {
+    // Preservar UTMs e dados de tracking ao resetar
+    const preservedData = {
+      utm_source: state.answers.utm_source,
+      utm_medium: state.answers.utm_medium,
+      utm_campaign: state.answers.utm_campaign,
+      utm_term: state.answers.utm_term,
+      utm_content: state.answers.utm_content,
+      referrer: state.answers.referrer,
+      landingPage: state.answers.landingPage,
+      userAgent: state.answers.userAgent,
+      ipAddress: state.answers.ipAddress,
+    };
+    
+    return {
+      currentStep: 0,
+      answers: { ...initialAnswers, ...preservedData },
+    };
+  }),
 }));
 

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 
 const workoutOptions = [
   { id: '0-2', label: '0-2 exercícios', description: 'Leve' },
@@ -82,7 +83,7 @@ export default function WorkoutsStep() {
       {/* Botão fixo no bottom */}
       <div className="px-5 md:px-6 pb-5 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
             disabled={!answers.workoutsPerWeek}
             className={`w-full py-3.5 md:py-5 px-6 rounded-[14px] md:rounded-[20px] font-semibold text-[15px] md:text-[17px] transition-all duration-200 ${
@@ -92,7 +93,7 @@ export default function WorkoutsStep() {
             }`}
           >
             Continuar
-          </button>
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
 
 const diets = [
   { id: 'classico', label: 'Clássico', description: 'Como de tudo' },
@@ -82,7 +83,7 @@ export default function DietTypeStep() {
       {/* Botão fixo no bottom */}
       <div className="px-6 pb-6 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
             disabled={!answers.dietType}
             className={`w-full py-4 md:py-5 px-6 rounded-[16px] md:rounded-[20px] font-semibold text-[16px] md:text-[17px] transition-all duration-200 ${
@@ -92,7 +93,7 @@ export default function DietTypeStep() {
             }`}
           >
             Continuar
-          </button>
+          </SafeNavigationButton>
         </div>
       </div>
     </div>

@@ -2,13 +2,15 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
-import { useEffect } from 'react';
+import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useEffect, useState } from 'react';
 
 export default function WeightGoalStep() {
   const router = useRouter();
   const params = useParams();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep, answers } = useQuizStore();
+  const [canContinue, setCanContinue] = useState(false);
 
   // Calcular diferença de peso
   const currentWeight = answers.weightKg || 70;
@@ -21,6 +23,10 @@ export default function WeightGoalStep() {
     if (goal === 'manter') {
       nextStep();
       router.replace(`/quiz/${currentStepFromUrl + 1}`);
+    } else {
+      // Habilitar botão após 2 segundos (tempo mínimo de leitura)
+      const enableButton = setTimeout(() => setCanContinue(true), 2000);
+      return () => clearTimeout(enableButton);
     }
   }, [goal, currentStepFromUrl, nextStep, router]);
 
@@ -68,12 +74,17 @@ export default function WeightGoalStep() {
       {/* Botão fixo no bottom */}
       <div className="px-6 pb-6 md:pb-8">
         <div className="max-w-md mx-auto w-full">
-          <button
+          <SafeNavigationButton
             onClick={handleContinue}
-            className="w-full py-4 md:py-5 px-6 rounded-[16px] md:rounded-[20px] font-semibold text-[16px] md:text-[17px] transition-all duration-200 bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90"
+            disabled={!canContinue}
+            className={`w-full py-4 md:py-5 px-6 rounded-[16px] md:rounded-[20px] font-semibold text-[16px] md:text-[17px] transition-all duration-200 ${
+              canContinue
+                ? 'bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Continuar
-          </button>
+            {canContinue ? 'Continuar' : 'Aguarde...'}
+          </SafeNavigationButton>
         </div>
       </div>
     </div>
