@@ -21,40 +21,47 @@ export async function POST(request: NextRequest) {
 
     console.log('🎨 Formatando planilha...');
 
-    // 1. Limpar tudo e adicionar cabeçalhos
+    // 1. Limpar tudo e adicionar cabeçalhos (36 colunas: A-AJ)
     const headers = [[
-      'Data/Hora',
-      'Nome',
-      'Email',
-      'Telefone',
-      'Gênero',
-      'Data Nascimento',
-      'Idade',
-      'Altura (cm)',
-      'Peso (kg)',
-      'Peso Desejado (kg)',
-      'Objetivo',
-      'Velocidade Semanal (kg)',
-      'Tipo Dieta',
-      'Treinos/Semana',
-      'Tem Personal',
-      'Conquistas',
-      'Obstáculos',
-      'Onde Ouviu',
-      'Já Usou Apps',
-      'Código Referência',
-      'UTM Source',
-      'UTM Medium',
-      'UTM Campaign',
-      'UTM Term',
-      'UTM Content',
-      'Referrer',
-      'Landing Page',
-      'User Agent',
-      'Unidade',
-      'Adicionar Calorias',
-      'Transferir Calorias',
+      'Data/Hora',              // A
+      'Nome',                   // B
+      'Email',                  // C
+      'Telefone',               // D
+      'Gênero',                 // E
+      'Data Nascimento',        // F
+      'Idade',                  // G
+      'Altura (cm)',            // H
+      'Peso (kg)',              // I
+      'Peso Desejado (kg)',     // J
+      'Objetivo',               // K
+      'Velocidade (kg/sem)',    // L
+      'Tipo Dieta',             // M
+      'Treinos/Semana',         // N
+      'Auxílio Treinos',        // O
+      'Auxílio Dieta',          // P
+      'Conquistas',             // Q
+      'Obstáculos',             // R
+      'Onde Ouviu',             // S
+      'Já Usou Apps',           // T
+      'Código Referência',      // U
+      'UTM Source',             // V
+      'UTM Medium',             // W
+      'UTM Campaign',           // X
+      'UTM Term',               // Y
+      'UTM Content',            // Z
+      'Referrer',               // AA
+      'Landing Page',           // AB
+      'User Agent',             // AC
+      'Unidade',                // AD
+      'Add Calorias',           // AE
+      'Transf. Calorias',       // AF
+      'Checkout Variant',       // AG - NOVO
+      'Checkout Plan',          // AH - NOVO
+      'Checkout URL',           // AI - NOVO
+      'Split Version',          // AJ - NOVO
     ]];
+    
+    const totalColumns = 36; // A até AJ
 
     // Obter o Sheet ID da primeira aba
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Depois, formatar tudo perfeitamente
     const requests = [
-      // 1. Formatar linha de cabeçalho (A1:AE1)
+      // 1. Formatar linha de cabeçalho (A1:AJ1)
       {
         repeatCell: {
           range: {
@@ -85,7 +92,7 @@ export async function POST(request: NextRequest) {
             startRowIndex: 0,
             endRowIndex: 1,
             startColumnIndex: 0,
-            endColumnIndex: 31,
+            endColumnIndex: totalColumns,
           },
           cell: {
             userEnteredFormat: {
@@ -171,8 +178,29 @@ export async function POST(request: NextRequest) {
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 20, endIndex: 31 }, // UTMs e tracking
-          properties: { pixelSize: 150 },
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 20, endIndex: 32 }, // UTMs e tracking (V-AF)
+          properties: { pixelSize: 130 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 32, endIndex: 34 }, // Checkout Variant e Plan (AG-AH)
+          properties: { pixelSize: 120 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 34, endIndex: 35 }, // Checkout URL (AI)
+          properties: { pixelSize: 300 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 35, endIndex: totalColumns }, // Split Version (AJ)
+          properties: { pixelSize: 100 },
           fields: 'pixelSize',
         },
       },
@@ -184,7 +212,7 @@ export async function POST(request: NextRequest) {
             sheetId,
             startRowIndex: 1,
             startColumnIndex: 0,
-            endColumnIndex: 31,
+            endColumnIndex: totalColumns,
           },
           cell: {
             userEnteredFormat: {
@@ -204,7 +232,7 @@ export async function POST(request: NextRequest) {
             startRowIndex: 0,
             endRowIndex: 1,
             startColumnIndex: 0,
-            endColumnIndex: 31,
+            endColumnIndex: totalColumns,
           },
           bottom: {
             style: 'SOLID',
@@ -222,9 +250,36 @@ export async function POST(request: NextRequest) {
               sheetId,
               startRowIndex: 0,
               startColumnIndex: 0,
-              endColumnIndex: 31,
+              endColumnIndex: totalColumns,
             },
           },
+        },
+      },
+      
+      // 8. Destacar colunas de checkout com cor diferente
+      {
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: 0,
+            endRowIndex: 1,
+            startColumnIndex: 32, // AG
+            endColumnIndex: totalColumns, // AJ
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.0, green: 0.5, blue: 0.3 }, // Verde escuro
+              textFormat: {
+                foregroundColor: { red: 1, green: 1, blue: 1 }, // Branco
+                fontSize: 11,
+                bold: true,
+              },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            },
+          },
+          fields: 'userEnteredFormat',
         },
       },
     ];

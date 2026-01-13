@@ -168,16 +168,25 @@ export default function PlanReadyStep() {
     const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
                         'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
+    // Calcular perda/ganho em 30 dias (aproximadamente 4.3 semanas)
+    const weeksIn30Days = 30 / 7; // ~4.29 semanas
+    const weightIn30Days = weightSpeed * weeksIn30Days;
+    
+    // Limitar ao máximo que falta para atingir a meta
+    const weightChangeIn30Days = Math.min(weightIn30Days, weightDiff);
+
     return {
       calories,
       carbGrams,
       proteinGrams,
       fatGrams,
       weightDiff: weightDiff.toFixed(1),
+      weightIn30Days: weightChangeIn30Days.toFixed(1),
       targetDate: `${targetDate.getDate()} de ${monthNames[targetDate.getMonth()]} de ${targetDate.getFullYear()}`,
       goal,
       weight,
       desiredWeight,
+      weightSpeed,
     };
   }, [answers]);
 
@@ -252,16 +261,39 @@ export default function PlanReadyStep() {
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-md mx-auto w-full">
           
-          {/* Ícone de check animado */}
+          {/* Banner de resultado em 30 dias - DESTAQUE PRINCIPAL */}
           <div 
-            className="flex justify-center mb-5 transition-all duration-500"
+            className="bg-gradient-to-r from-[#FF911A] to-[#FF6B00] rounded-2xl p-5 mb-6 text-center transition-all duration-500 shadow-lg"
             style={{ 
               opacity: isAnimated ? 1 : 0, 
-              transform: isAnimated ? 'scale(1)' : 'scale(0.5)'
+              transform: isAnimated ? 'scale(1)' : 'scale(0.9)',
             }}
           >
-            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg shadow-green-200">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <p className="text-white/90 text-[14px] font-medium mb-2">
+              Em 30 dias você pode
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-white text-[40px] md:text-[48px] font-extrabold leading-none">
+                {calculations.goal === 'perder' ? '-' : calculations.goal === 'ganhar' ? '+' : ''}{calculations.weightIn30Days}
+              </span>
+              <span className="text-white text-[24px] md:text-[28px] font-bold">kg</span>
+            </div>
+            <p className="text-white/80 text-[13px] mt-2">
+              Seguindo seu plano personalizado
+            </p>
+          </div>
+
+          {/* Ícone de check animado */}
+          <div 
+            className="flex justify-center mb-4 transition-all duration-500"
+            style={{ 
+              opacity: isAnimated ? 1 : 0, 
+              transform: isAnimated ? 'scale(1)' : 'scale(0.5)',
+              transitionDelay: '100ms'
+            }}
+          >
+            <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg shadow-green-200">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                 <path 
                   d="M5 12l5 5L19 7" 
                   stroke="white" 
@@ -272,7 +304,7 @@ export default function PlanReadyStep() {
                   style={{
                     strokeDasharray: 30,
                     strokeDashoffset: isAnimated ? 0 : 30,
-                    transition: 'stroke-dashoffset 0.5s ease-out 0.3s'
+                    transition: 'stroke-dashoffset 0.5s ease-out 0.4s'
                   }}
                 />
               </svg>
@@ -281,11 +313,11 @@ export default function PlanReadyStep() {
 
           {/* Título */}
           <h1 
-            className="text-[26px] md:text-[30px] font-bold text-black text-center mb-6 leading-tight transition-all duration-500"
+            className="text-[22px] md:text-[26px] font-bold text-black text-center mb-5 leading-tight transition-all duration-500"
             style={{ 
               opacity: isAnimated ? 1 : 0, 
               transform: isAnimated ? 'translateY(0)' : 'translateY(10px)',
-              transitionDelay: '100ms'
+              transitionDelay: '200ms'
             }}
           >
             Parabéns! 🎉<br />

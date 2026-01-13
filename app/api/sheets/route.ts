@@ -154,6 +154,12 @@ export async function POST(request: NextRequest) {
       body.unit || 'metric',                        // AD - Unidade (métrica/imperial)
       body.addBurnedCalories ? 'Sim' : 'Não',      // AE - Adicionar Calorias Queimadas
       body.transferExtraCalories ? 'Sim' : 'Não',  // AF - Transferir Calorias Extras
+      
+      // Checkout Split (NOVAS COLUNAS)
+      body.checkout_variant || '',                  // AG - Checkout Variant (hubla/proprio)
+      body.checkout_plan || '',                     // AH - Checkout Plan (annual/monthly)
+      body.checkout_url || '',                      // AI - Checkout URL (com UTMs)
+      body.split_version || '',                     // AJ - Split Version (ex: 80_20_v1)
     ]];
 
     // Inserir dados na planilha
@@ -163,7 +169,7 @@ export async function POST(request: NextRequest) {
     
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'A:AF', // Expandido para incluir todos os campos (até coluna AF)
+      range: 'A:AJ', // Expandido para incluir checkout split (até coluna AJ)
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
