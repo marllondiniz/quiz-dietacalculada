@@ -20,10 +20,10 @@ export async function POST(request: NextRequest) {
 
     console.log('🧹 Limpando dados antigos...');
 
-    // Limpar todas as linhas exceto o cabeçalho
+    // Limpar todas as linhas exceto o cabeçalho (até coluna AK)
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: 'A2:AE1000',
+      range: 'A2:AK1000',
     });
 
     console.log('✅ Dados limpos com sucesso!');

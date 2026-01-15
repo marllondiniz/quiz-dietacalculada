@@ -9,6 +9,7 @@ export interface QuizAnswers {
   
   // Dados físicos
   birthDate?: Date;
+  age?: number;
   gender?: 'masculino' | 'feminino' | 'outro';
   unit?: 'imperial' | 'metric';
   heightFt?: number;
@@ -52,6 +53,8 @@ interface QuizStore {
   currentStep: number;
   answers: QuizAnswers;
   totalSteps: number;
+  leadId: string | null;
+  setLeadId: (leadId: string) => void;
   setCurrentStep: (step: number) => void;
   updateAnswer: (key: keyof QuizAnswers, value: any) => void;
   nextStep: () => void;
@@ -64,7 +67,9 @@ const initialAnswers: QuizAnswers = {};
 export const useQuizStore = create<QuizStore>((set) => ({
   currentStep: 0,
   answers: initialAnswers,
-  totalSteps: 23,
+  totalSteps: 24,
+  leadId: null,
+  setLeadId: (leadId) => set({ leadId }),
   setCurrentStep: (step) => set({ currentStep: step }),
   updateAnswer: (key, value) =>
     set((state) => ({

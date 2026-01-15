@@ -317,13 +317,20 @@ export async function POST(request: NextRequest) {
       'nutricionista-presencial': 'Tenho nutricionista presencial',
     };
 
-    const birthDate = quizData.birthDate 
-      ? new Date(quizData.birthDate).toLocaleDateString('pt-BR')
-      : '';
+    // Formatar data de nascimento e calcular idade
+    let birthDate = '';
+    let age = '';
     
-    const age = birthDate && quizData.birthDate 
-      ? new Date().getFullYear() - new Date(quizData.birthDate).getFullYear()
-      : '';
+    if (quizData.birthDate) {
+      try {
+        const birthDateObj = new Date(quizData.birthDate);
+        birthDate = birthDateObj.toLocaleDateString('pt-BR');
+        age = String(new Date().getFullYear() - birthDateObj.getFullYear());
+        console.log(`📅 Data nascimento: ${birthDate}, Idade: ${age} anos`);
+      } catch (error) {
+        console.error('❌ Erro ao processar data de nascimento:', error);
+      }
+    }
 
     const achievements = Array.isArray(quizData.achievements) 
       ? quizData.achievements.join(', ') 
@@ -341,50 +348,51 @@ export async function POST(request: NextRequest) {
       ? (dietHelperOptionMap[quizData.dietHelper] || quizData.dietHelper)
       : '';
 
-    // Linha de dados para inserir (36 colunas: A-AJ)
+    // Linha de dados - ORDEM EXATA DO QUIZ (37 colunas: A-AK)
     const values = [[
       timestamp,                                    // A - Data/Hora
-      quizData.name || '',                          // B - Nome
-      quizData.email || '',                         // C - Email
-      quizData.phone || '',                         // D - Telefone
-      quizData.gender || '',                        // E - Gênero
-      birthDate,                                    // F - Data de Nascimento
-      age,                                          // G - Idade
-      quizData.heightCm || '',                      // H - Altura (cm)
-      quizData.weightKg || '',                      // I - Peso (kg)
-      quizData.desiredWeightKg || '',               // J - Peso Desejado (kg)
-      quizData.goal || '',                          // K - Objetivo
-      quizData.weightSpeedPerWeek || '',            // L - Velocidade Semanal
-      quizData.dietType || '',                      // M - Tipo de Dieta
-      quizData.workoutsPerWeek || '',               // N - Treinos por Semana
-      trainerOption,                                // O - Auxílio em Treinos
-      dietHelperOption,                             // P - Auxílio na Dieta
-      achievements,                                 // Q - Conquistas
-      obstacles,                                    // R - Obstáculos
-      quizData.heardFrom || '',                     // S - Onde Ouviu
-      quizData.triedOtherApps ? 'Sim' : 'Não',      // T - Já Usou Apps
-      quizData.referralCode || '',                  // U - Código Referência
-      utmParams.utm_source || '',                   // V - UTM Source
-      utmParams.utm_medium || '',                   // W - UTM Medium
-      utmParams.utm_campaign || '',                 // X - UTM Campaign
-      utmParams.utm_term || '',                     // Y - UTM Term
-      utmParams.utm_content || '',                  // Z - UTM Content
-      quizData.referrer || '',                      // AA - Referrer
-      quizData.landingPage || '',                   // AB - Landing Page
-      quizData.userAgent || '',                     // AC - User Agent
-      quizData.unit || 'metric',                    // AD - Unidade
-      quizData.addBurnedCalories ? 'Sim' : 'Não',   // AE - Add Calorias
-      quizData.transferExtraCalories ? 'Sim' : 'Não', // AF - Transf. Calorias
-      variant,                                      // AG - Checkout Variant
-      plan,                                         // AH - Checkout Plan
-      checkoutUrl,                                  // AI - Checkout URL
-      SPLIT_VERSION,                                // AJ - Split Version
+      quizData.leadId || '',                        // B - Lead ID
+      quizData.gender || '',                        // C - Step 0: Gênero
+      quizData.workoutsPerWeek || '',               // D - Step 1: Treinos/Semana
+      quizData.triedOtherApps ? 'Sim' : 'Não',      // E - Step 2: Já Usou Apps
+      quizData.name || '',                          // F - Step 4: Nome
+      quizData.email || '',                         // G - Step 4: Email
+      quizData.phone || '',                         // H - Step 4: Telefone
+      quizData.heightCm || '',                      // I - Step 5: Altura
+      quizData.weightKg || '',                      // J - Step 5: Peso
+      quizData.unit || 'metric',                    // K - Step 5: Unidade
+      birthDate,                                    // L - Step 6: Data Nascimento
+      age,                                          // M - Step 6: Idade
+      trainerOption,                                // N - Step 7: Auxílio Treinos
+      dietHelperOption,                             // O - Step 8: Auxílio Dieta
+      quizData.goal || '',                          // P - Step 9: Objetivo
+      quizData.desiredWeightKg || '',               // Q - Step 10: Peso Desejado
+      quizData.weightSpeedPerWeek || '',            // R - Step 13: Velocidade
+      obstacles,                                    // S - Step 15: Obstáculos
+      quizData.dietType || '',                      // T - Step 16: Tipo Dieta
+      achievements,                                 // U - Step 17: Conquistas
+      variant,                                      // V - Step 23: Checkout Variant
+      plan,                                         // W - Step 23: Checkout Plan
+      checkoutUrl,                                  // X - Step 23: Checkout URL
+      SPLIT_VERSION,                                // Y - Step 23: Split Version
+      quizData.referralCode || '',                  // Z - Código Referência
+      quizData.heardFrom || '',                     // AA - Onde Ouviu
+      quizData.addBurnedCalories ? 'Sim' : 'Não',   // AB - Add Calorias
+      quizData.transferExtraCalories ? 'Sim' : 'Não', // AC - Transf. Calorias
+      utmParams.utm_source || '',                   // AD - UTM Source
+      utmParams.utm_medium || '',                   // AE - UTM Medium
+      utmParams.utm_campaign || '',                 // AF - UTM Campaign
+      utmParams.utm_term || '',                     // AG - UTM Term
+      utmParams.utm_content || '',                  // AH - UTM Content
+      quizData.referrer || '',                      // AI - Referrer
+      quizData.landingPage || '',                   // AJ - Landing Page
+      quizData.userAgent || '',                     // AK - User Agent
     ]];
 
-    // Salvar dados na planilha principal
+    // Salvar dados na planilha principal (usando range sem especificar aba, como na API original)
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${DATA_SHEET_NAME}!A:AJ`,
+      range: 'A:AK',
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values },

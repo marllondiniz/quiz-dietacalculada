@@ -21,47 +21,49 @@ export async function POST(request: NextRequest) {
 
     console.log('🎨 Formatando planilha...');
 
-    // 1. Limpar tudo e adicionar cabeçalhos (36 colunas: A-AJ)
+    // 1. Limpar tudo e adicionar cabeçalhos (37 colunas: A-AK)
+    // ORDEM EXATA DAS PERGUNTAS DO QUIZ
     const headers = [[
-      'Data/Hora',              // A
-      'Nome',                   // B
-      'Email',                  // C
-      'Telefone',               // D
-      'Gênero',                 // E
-      'Data Nascimento',        // F
-      'Idade',                  // G
-      'Altura (cm)',            // H
-      'Peso (kg)',              // I
-      'Peso Desejado (kg)',     // J
-      'Objetivo',               // K
-      'Velocidade (kg/sem)',    // L
-      'Tipo Dieta',             // M
-      'Treinos/Semana',         // N
-      'Auxílio Treinos',        // O
-      'Auxílio Dieta',          // P
-      'Conquistas',             // Q
-      'Obstáculos',             // R
-      'Onde Ouviu',             // S
-      'Já Usou Apps',           // T
-      'Código Referência',      // U
-      'UTM Source',             // V
-      'UTM Medium',             // W
-      'UTM Campaign',           // X
-      'UTM Term',               // Y
-      'UTM Content',            // Z
-      'Referrer',               // AA
-      'Landing Page',           // AB
-      'User Agent',             // AC
-      'Unidade',                // AD
-      'Add Calorias',           // AE
-      'Transf. Calorias',       // AF
-      'Checkout Variant',       // AG - NOVO
-      'Checkout Plan',          // AH - NOVO
-      'Checkout URL',           // AI - NOVO
-      'Split Version',          // AJ - NOVO
+      'Data/Hora',              // A - Timestamp
+      'Lead ID',                // B - Identificador único
+      'Gênero',                 // C - Step 0
+      'Treinos/Semana',         // D - Step 1
+      'Já Usou Apps',           // E - Step 2
+      'Nome',                   // F - Step 4
+      'Email',                  // G - Step 4
+      'Telefone',               // H - Step 4
+      'Altura (cm)',            // I - Step 5
+      'Peso (kg)',              // J - Step 5
+      'Unidade',                // K - Step 5 (metric/imperial)
+      'Data Nascimento',        // L - Step 6
+      'Idade',                  // M - Step 6 (calculado)
+      'Auxílio Treinos',        // N - Step 7
+      'Auxílio Dieta',          // O - Step 8
+      'Objetivo',               // P - Step 9
+      'Peso Desejado (kg)',     // Q - Step 10
+      'Velocidade (kg/sem)',    // R - Step 13
+      'Obstáculos',             // S - Step 15
+      'Tipo Dieta',             // T - Step 16
+      'Conquistas',             // U - Step 17
+      'Checkout Variant',       // V - Step 23 (hubla/proprio)
+      'Checkout Plan',          // W - Step 23 (annual/monthly)
+      'Checkout URL',           // X - Step 23
+      'Split Version',          // Y - Step 23
+      'Código Referência',      // Z - Opcional
+      'Onde Ouviu',             // AA - Opcional
+      'Add Calorias',           // AB - Configuração
+      'Transf. Calorias',       // AC - Configuração
+      'UTM Source',             // AD - Tracking
+      'UTM Medium',             // AE - Tracking
+      'UTM Campaign',           // AF - Tracking
+      'UTM Term',               // AG - Tracking
+      'UTM Content',            // AH - Tracking
+      'Referrer',               // AI - Tracking
+      'Landing Page',           // AJ - Tracking
+      'User Agent',             // AK - Tracking
     ]];
     
-    const totalColumns = 36; // A até AJ
+    const totalColumns = 37; // A até AK
 
     // Obter o Sheet ID da primeira aba
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
@@ -140,67 +142,95 @@ export async function POST(request: NextRequest) {
         },
       },
 
-      // 4. Ajustar larguras das colunas principais
+      // 4. Ajustar larguras das colunas (ORDEM EXATA DO QUIZ)
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, // Data/Hora
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, // A: Data/Hora
           properties: { pixelSize: 150 },
           fields: 'pixelSize',
         },
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, // Nome
-          properties: { pixelSize: 180 },
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, // B: Lead ID
+          properties: { pixelSize: 280 },
           fields: 'pixelSize',
         },
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, // Email
-          properties: { pixelSize: 220 },
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, // C: Gênero
+          properties: { pixelSize: 110 },
           fields: 'pixelSize',
         },
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 }, // Telefone
-          properties: { pixelSize: 140 },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 4, endIndex: 20 }, // Colunas de dados
-          properties: { pixelSize: 120 },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 20, endIndex: 32 }, // UTMs e tracking (V-AF)
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 5 }, // D-E: Treinos, Já Usou Apps
           properties: { pixelSize: 130 },
           fields: 'pixelSize',
         },
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 32, endIndex: 34 }, // Checkout Variant e Plan (AG-AH)
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 5, endIndex: 6 }, // F: Nome
+          properties: { pixelSize: 180 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 6, endIndex: 7 }, // G: Email
+          properties: { pixelSize: 220 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 7, endIndex: 8 }, // H: Telefone
+          properties: { pixelSize: 140 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 8, endIndex: 21 }, // I-U: Dados do quiz (Altura até Conquistas)
+          properties: { pixelSize: 130 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 21, endIndex: 23 }, // V-W: Checkout Variant e Plan
+          properties: { pixelSize: 130 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 23, endIndex: 24 }, // X: Checkout URL
+          properties: { pixelSize: 350 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 24, endIndex: 25 }, // Y: Split Version
+          properties: { pixelSize: 150 },
+          fields: 'pixelSize',
+        },
+      },
+      {
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 25, endIndex: 29 }, // Z-AC: Código Ref, Onde Ouviu, Config
           properties: { pixelSize: 120 },
           fields: 'pixelSize',
         },
       },
       {
         updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 34, endIndex: 35 }, // Checkout URL (AI)
-          properties: { pixelSize: 300 },
-          fields: 'pixelSize',
-        },
-      },
-      {
-        updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: 35, endIndex: totalColumns }, // Split Version (AJ)
-          properties: { pixelSize: 100 },
+          range: { sheetId, dimension: 'COLUMNS', startIndex: 29, endIndex: totalColumns }, // AD-AK: UTMs e Tracking
+          properties: { pixelSize: 140 },
           fields: 'pixelSize',
         },
       },
@@ -256,15 +286,15 @@ export async function POST(request: NextRequest) {
         },
       },
       
-      // 8. Destacar colunas de checkout com cor diferente
+      // 8. Destacar colunas de checkout com cor diferente (V-Y)
       {
         repeatCell: {
           range: {
             sheetId,
             startRowIndex: 0,
             endRowIndex: 1,
-            startColumnIndex: 32, // AG
-            endColumnIndex: totalColumns, // AJ
+            startColumnIndex: 21, // V: Checkout Variant
+            endColumnIndex: 25, // Y: Split Version
           },
           cell: {
             userEnteredFormat: {

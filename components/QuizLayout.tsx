@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import ProgressBar from './ProgressBar';
 import { useQuizStore } from '@/store/quizStore';
 import { useRouter, useParams } from 'next/navigation';
+import { useQuizProgress } from '@/hooks/useQuizProgress';
 
 interface QuizLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,9 @@ export default function QuizLayout({
   const router = useRouter();
   const params = useParams();
   const stepFromUrl = parseInt(params.step as string, 10);
+  
+  // Salvamento progressivo com debounce otimizado
+  useQuizProgress();
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationKey, setAnimationKey] = useState(stepFromUrl);

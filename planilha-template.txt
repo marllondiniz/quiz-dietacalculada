@@ -1,4 +1,0 @@
-Copie e cole esta linha na primeira linha da sua planilha do Google Sheets:
-
-Data/Hora | Nome | Email | Telefone | Gênero | Data Nascimento | Idade | Altura (cm) | Peso (kg) | Peso Desejado (kg) | Objetivo | Velocidade Semanal (kg) | Tipo Dieta | Treinos/Semana | Tem Personal | Conquistas | Obstáculos | Onde Ouviu | Já Usou Apps | Código Referência | UTM Source | UTM Medium | UTM Campaign | UTM Term | UTM Content | Referrer | Landing Page | User Agent | Unidade | Adicionar Calorias | Transferir Calorias
-

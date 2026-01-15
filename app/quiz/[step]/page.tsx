@@ -20,6 +20,7 @@ import AchievementsStep from '@/components/steps/AchievementsStep';
 import ThankYouStep from '@/components/steps/ThankYouStep';
 import DesiredWeightStep from '@/components/steps/DesiredWeightStep';
 import WeightGoalStep from '@/components/steps/WeightGoalStep';
+import AlmostThereStep from '@/components/steps/AlmostThereStep';
 import WeightSpeedStep from '@/components/steps/WeightSpeedStep';
 import ComparisonStep from '@/components/steps/ComparisonStep';
 import TrustStep from '@/components/steps/TrustStep';
@@ -41,17 +42,18 @@ const steps = [
   GoalStep,             // Etapa 9 - Objetivo
   DesiredWeightStep,    // Etapa 10 - Peso desejado
   WeightGoalStep,       // Etapa 11 - Meta motivacional
-  WeightSpeedStep,      // Etapa 12 - Velocidade de perda
-  ComparisonStep,       // Etapa 13 - Comparação
-  ObstaclesStep,        // Etapa 14 - Obstáculos
-  DietTypeStep,         // Etapa 15 - Tipo de dieta
-  AchievementsStep,     // Etapa 16 - Conquistas
-  TrustStep,            // Etapa 17 - Obrigado por confiar
-  ReadyStep,            // Etapa 18 - Tudo pronto
-  LoadingStep,          // Etapa 19 - Carregando plano
-  PlanReadyStep,        // Etapa 20 - Plano pronto
-  GoalsGuideStep,       // Etapa 21 - Como atingir metas
-  ThankYouStep,         // Etapa 22 - Oferta final
+  AlmostThereStep,     // Etapa 12 - Falta pouco!
+  WeightSpeedStep,      // Etapa 13 - Velocidade de perda
+  ComparisonStep,       // Etapa 14 - Comparação
+  ObstaclesStep,        // Etapa 15 - Obstáculos
+  DietTypeStep,         // Etapa 16 - Tipo de dieta
+  AchievementsStep,     // Etapa 17 - Conquistas
+  TrustStep,            // Etapa 18 - Obrigado por confiar
+  ReadyStep,            // Etapa 19 - Tudo pronto
+  LoadingStep,          // Etapa 20 - Carregando plano
+  PlanReadyStep,        // Etapa 21 - Plano pronto
+  GoalsGuideStep,       // Etapa 22 - Como atingir metas
+  ThankYouStep,         // Etapa 23 - Oferta final
 ];
 
 export default function QuizPage() {

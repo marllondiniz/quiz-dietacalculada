@@ -4,6 +4,7 @@ import { useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import TrackingCapture from '@/components/TrackingCapture';
+import { sendFacebookConversion, getFacebookBrowserId, getFacebookClickId } from '@/lib/facebookPixel';
 
 export default function Home() {
   const router = useRouter();
@@ -11,6 +12,21 @@ export default function Home() {
 
   useEffect(() => {
     reset();
+    
+    // Enviar PageView para Facebook Conversions API
+    sendFacebookConversion(
+      'PageView',
+      {
+        client_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        fbp: getFacebookBrowserId() || undefined,
+        fbc: getFacebookClickId() || undefined,
+      },
+      {
+        content_name: 'Landing Page - Quiz Dieta',
+        content_category: 'Landing Page',
+      },
+      `pageview_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    );
   }, [reset]);
 
   const handleStart = () => {

@@ -4,6 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useState } from 'react';
+import { 
+  trackFacebookEvent, 
+  sendFacebookConversion,
+  getFacebookBrowserId,
+  getFacebookClickId
+} from '@/lib/facebookPixel';
 
 export default function ContactInfoStep() {
   const router = useRouter();
@@ -15,9 +21,37 @@ export default function ContactInfoStep() {
 
   const handleContinue = () => {
     if (name.trim() && email.trim() && phone.trim()) {
-      updateAnswer('name', name.trim());
-      updateAnswer('email', email.trim());
-      updateAnswer('phone', phone.trim());
+      const trimmedName = name.trim();
+      const trimmedEmail = email.trim();
+      const trimmedPhone = phone.trim();
+      
+      updateAnswer('name', trimmedName);
+      updateAnswer('email', trimmedEmail);
+      updateAnswer('phone', trimmedPhone);
+      
+      // Disparar evento Lead do Facebook Pixel (client-side)
+      trackFacebookEvent('Lead', {
+        content_name: 'Quiz Lead',
+        content_category: 'Diet Quiz',
+      });
+      
+      // Enviar evento Lead para Facebook Conversions API (server-side)
+      sendFacebookConversion(
+        'Lead',
+        {
+          email: trimmedEmail,
+          phone: trimmedPhone,
+          client_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+          fbp: getFacebookBrowserId() || undefined,
+          fbc: getFacebookClickId() || undefined,
+        },
+        {
+          content_name: 'Quiz Lead',
+          content_category: 'Diet Quiz',
+        },
+        `lead_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      );
+      
       nextStep();
       router.push(`/quiz/${currentStep + 1}`);
     }

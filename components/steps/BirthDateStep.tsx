@@ -57,15 +57,18 @@ export default function BirthDateStep() {
     setYear(prev => Math.max(1920, Math.min(currentYear - 10, prev + delta)));
   };
 
+  // Calcular idade
+  const age = currentYear - year;
+
   const handleContinue = () => {
     const birthDate = new Date(year, month - 1, Math.min(day, daysInMonth));
     updateAnswer('birthDate', birthDate);
+    // Também salvar a idade calculada
+    updateAnswer('age', age);
+    console.log('📅 Salvando data de nascimento e idade:', { birthDate, age });
     nextStep();
     router.push(`/quiz/${currentStep + 1}`);
   };
-
-  // Calcular idade
-  const age = currentYear - year;
 
   return (
     <div className="h-full flex flex-col bg-white">

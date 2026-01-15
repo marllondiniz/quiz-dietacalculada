@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 type PlanType = 'annual' | 'monthly';
 
 export default function ThankYouStep() {
-  const { answers } = useQuizStore();
+  const { answers, leadId } = useQuizStore();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
   const [isRedirecting, setIsRedirecting] = useState(false);
   const searchParams = useSearchParams();
@@ -60,6 +60,7 @@ export default function ThankYouStep() {
       // Preparar dados do quiz para envio
       const quizData = {
         ...answers,
+        leadId: leadId || undefined,
         birthDate: answers.birthDate 
           ? (answers.birthDate instanceof Date 
               ? answers.birthDate.toISOString() 
@@ -170,12 +171,23 @@ export default function ThankYouStep() {
                   <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Anual</h3>
                   
                   <div className="mb-2 md:mb-3">
-                    <p className="text-[26px] md:text-[32px] font-bold text-black leading-none">
-                      12x de R$ 10,90
-                    </p>
-                    <p className="text-[12px] md:text-[13px] text-green-600 font-semibold mt-1">
-                      💰 Economize 70% com o plano anual
-                    </p>
+                    {/* Valor destacado - 12x R$ 10,24 */}
+                    <div className="bg-gradient-to-br from-[#FF911A]/10 to-[#FF6B00]/10 rounded-xl p-3 md:p-4 mb-2 border-2 border-[#FF911A]/30">
+                      <div className="flex items-baseline justify-center gap-1.5">
+                        <span className="text-[18px] md:text-[22px] font-bold text-gray-700">12x de</span>
+                        <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 10,24</span>
+                      </div>
+                      <p className="text-[11px] md:text-[12px] text-gray-600 text-center mt-1">
+                        ou R$ 99,90 à vista
+                      </p>
+                    </div>
+                    
+                    {/* Badge de economia destacado */}
+                    <div className="flex justify-center mt-2">
+                      <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-1.5 rounded-full text-[12px] md:text-[13px] font-bold shadow-lg transform hover:scale-105 transition-transform">
+                        💰 Economize R$ 234,90 no ano!
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 md:space-y-2">
@@ -250,7 +262,7 @@ export default function ThankYouStep() {
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Acesso completo à plataforma</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Acesso completo por 1 mês</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -258,7 +270,7 @@ export default function ThankYouStep() {
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Cancele quando quiser</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Suporte prioritário</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -266,7 +278,7 @@ export default function ThankYouStep() {
                           <path d="M5 12l5 5L19 7"/>
                         </svg>
                       </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Suporte por WhatsApp</p>
+                      <p className="text-[12px] md:text-[13px] text-gray-700">Todas as atualizações incluídas</p>
                     </div>
                   </div>
                 </div>

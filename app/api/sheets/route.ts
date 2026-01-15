@@ -91,75 +91,60 @@ export async function POST(request: NextRequest) {
       ? (dietHelperOptionMap[body.dietHelper] || body.dietHelper)
       : '';
 
-    // Formatar data de nascimento
-    const birthDate = body.birthDate 
-      ? new Date(body.birthDate).toLocaleDateString('pt-BR')
-      : '';
+    // Formatar data de nascimento e calcular idade
+    let birthDate = '';
+    let age = '';
+    
+    if (body.birthDate) {
+      try {
+        const birthDateObj = new Date(body.birthDate);
+        birthDate = birthDateObj.toLocaleDateString('pt-BR');
+        age = String(new Date().getFullYear() - birthDateObj.getFullYear());
+        console.log(`📅 Data nascimento: ${birthDate}, Idade: ${age} anos`);
+      } catch (error) {
+        console.error('❌ Erro ao processar data de nascimento:', error);
+      }
+    }
 
-    // Calcular idade se tiver data de nascimento
-    const age = birthDate && body.birthDate 
-      ? new Date().getFullYear() - new Date(body.birthDate).getFullYear()
-      : '';
-
-    // Linha de dados para inserir
+    // Linha de dados - ORDEM EXATA DO QUIZ
     const values = [[
-      // Timestamp e identificação
       timestamp,                                    // A - Data/Hora
-      body.name || '',                              // B - Nome
-      body.email || '',                             // C - Email
-      body.phone || '',                             // D - Telefone
-      
-      // Dados demográficos
-      body.gender || '',                            // E - Gênero
-      birthDate,                                    // F - Data de Nascimento
-      age,                                          // G - Idade
-      
-      // Dados físicos
-      body.heightCm || '',                          // H - Altura (cm)
-      body.weightKg || '',                          // I - Peso (kg)
-      body.desiredWeightKg || '',                   // J - Peso Desejado (kg)
-      
-      // Objetivos
-      body.goal || '',                              // K - Objetivo (perder/manter/ganhar)
-      body.weightSpeedPerWeek || '',                // L - Velocidade Semanal (kg)
-      
-      // Estilo de vida
-      body.dietType || '',                          // M - Tipo de Dieta
-      body.workoutsPerWeek || '',                   // N - Treinos por Semana
-      trainerOption,                                 // O - Tem Personal Trainer
-      dietHelperOption,                              // P - Auxílio na Dieta
-      
-      // Motivação e desafios
-      achievements,                                  // Q - Conquistas
-      obstacles,                                     // R - Obstáculos
-      
-      // Marketing
-      body.heardFrom || '',                         // S - Onde Ouviu Falar
-      body.triedOtherApps ? 'Sim' : 'Não',          // T - Já Usou Outros Apps
-      body.referralCode || '',                      // U - Código de Referência
-      
-      // UTMs
-      body.utm_source || '',                        // V - UTM Source
-      body.utm_medium || '',                        // W - UTM Medium
-      body.utm_campaign || '',                      // X - UTM Campaign
-      body.utm_term || '',                          // Y - UTM Term
-      body.utm_content || '',                       // Z - UTM Content
-      
-      // Tracking adicional
-      body.referrer || '',                          // AA - Referrer
-      body.landingPage || '',                       // AB - Landing Page
-      body.userAgent || '',                         // AC - User Agent
-      
-      // Configurações
-      body.unit || 'metric',                        // AD - Unidade (métrica/imperial)
-      body.addBurnedCalories ? 'Sim' : 'Não',      // AE - Adicionar Calorias Queimadas
-      body.transferExtraCalories ? 'Sim' : 'Não',  // AF - Transferir Calorias Extras
-      
-      // Checkout Split (NOVAS COLUNAS)
-      body.checkout_variant || '',                  // AG - Checkout Variant (hubla/proprio)
-      body.checkout_plan || '',                     // AH - Checkout Plan (annual/monthly)
-      body.checkout_url || '',                      // AI - Checkout URL (com UTMs)
-      body.split_version || '',                     // AJ - Split Version (ex: 80_20_v1)
+      body.leadId || '',                            // B - Lead ID
+      body.gender || '',                            // C - Step 0: Gênero
+      body.workoutsPerWeek || '',                   // D - Step 1: Treinos/Semana
+      body.triedOtherApps ? 'Sim' : 'Não',          // E - Step 2: Já Usou Apps
+      body.name || '',                              // F - Step 4: Nome
+      body.email || '',                             // G - Step 4: Email
+      body.phone || '',                             // H - Step 4: Telefone
+      body.heightCm || '',                          // I - Step 5: Altura
+      body.weightKg || '',                          // J - Step 5: Peso
+      body.unit || 'metric',                        // K - Step 5: Unidade
+      birthDate,                                    // L - Step 6: Data Nascimento
+      age,                                          // M - Step 6: Idade
+      trainerOption,                                // N - Step 7: Auxílio Treinos
+      dietHelperOption,                             // O - Step 8: Auxílio Dieta
+      body.goal || '',                              // P - Step 9: Objetivo
+      body.desiredWeightKg || '',                   // Q - Step 10: Peso Desejado
+      body.weightSpeedPerWeek || '',                // R - Step 13: Velocidade
+      obstacles,                                    // S - Step 15: Obstáculos
+      body.dietType || '',                          // T - Step 16: Tipo Dieta
+      achievements,                                 // U - Step 17: Conquistas
+      body.checkout_variant || '',                  // V - Step 23: Checkout Variant
+      body.checkout_plan || '',                     // W - Step 23: Checkout Plan
+      body.checkout_url || '',                      // X - Step 23: Checkout URL
+      body.split_version || '',                     // Y - Step 23: Split Version
+      body.referralCode || '',                      // Z - Código Referência
+      body.heardFrom || '',                         // AA - Onde Ouviu
+      body.addBurnedCalories ? 'Sim' : 'Não',      // AB - Add Calorias
+      body.transferExtraCalories ? 'Sim' : 'Não',  // AC - Transf. Calorias
+      body.utm_source || '',                        // AD - UTM Source
+      body.utm_medium || '',                        // AE - UTM Medium
+      body.utm_campaign || '',                      // AF - UTM Campaign
+      body.utm_term || '',                          // AG - UTM Term
+      body.utm_content || '',                       // AH - UTM Content
+      body.referrer || '',                          // AI - Referrer
+      body.landingPage || '',                       // AJ - Landing Page
+      body.userAgent || '',                         // AK - User Agent
     ]];
 
     // Inserir dados na planilha
@@ -169,7 +154,7 @@ export async function POST(request: NextRequest) {
     
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'A:AJ', // Expandido para incluir checkout split (até coluna AJ)
+      range: 'A:AK', // Expandido para incluir Lead ID e checkout split (até coluna AK)
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
