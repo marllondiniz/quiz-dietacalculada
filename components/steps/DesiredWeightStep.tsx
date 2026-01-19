@@ -41,7 +41,7 @@ export default function DesiredWeightStep() {
   const maxWeight = 200;
 
   const getTitle = () => {
-    if (goal === 'ganhar') return 'Qual é o seu peso ideal?';
+    if (goal === 'ganhar') return 'Qual a sua meta de peso?';
     return 'Qual é o seu peso desejado?';
   };
 
