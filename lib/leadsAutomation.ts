@@ -73,8 +73,22 @@ export async function getGoogleSheetsInstance(): Promise<{
   return { sheets, spreadsheetId };
 }
 
+// Headers padrão da aba de automação
+export const AUTOMATION_HEADERS = [
+  'lead_id',
+  'FirstName',
+  'email',
+  'phone',
+  'created_at',
+  'purchased',
+  'zaia_sent',
+  'checkout_source',
+  'purchase_at',
+];
+
 /**
  * Verifica se a aba Leads_Automacao existe, se não, cria com os headers
+ * Se existir mas estiver vazia, adiciona os headers
  */
 export async function ensureAutomationSheetExists(): Promise<void> {
   const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
@@ -105,29 +119,43 @@ export async function ensureAutomationSheetExists(): Promise<void> {
       },
     });
 
-    // Adicionar headers
-    const headers = [
-      'lead_id',
-      'FirstName',
-      'email',
-      'phone',
-      'created_at',
-      'purchased',
-      'zaia_sent',
-      'checkout_source',
-      'purchase_at',
-    ];
+    console.log(`✅ Aba ${AUTOMATION_SHEET_NAME} criada`);
+  }
 
+  // Verificar se os headers existem (primeira linha)
+  try {
+    const headerRow = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
+    });
+
+    const existingHeaders = headerRow.data.values?.[0] || [];
+    
+    // Se não tem headers ou está incompleto, adicionar
+    if (existingHeaders.length === 0 || existingHeaders[0] !== 'lead_id') {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [AUTOMATION_HEADERS],
+        },
+      });
+
+      console.log(`✅ Headers adicionados à aba ${AUTOMATION_SHEET_NAME}`);
+    }
+  } catch (error) {
+    // Se der erro ao ler, provavelmente a aba está vazia, adicionar headers
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [headers],
+        values: [AUTOMATION_HEADERS],
       },
     });
 
-    console.log(`✅ Aba ${AUTOMATION_SHEET_NAME} criada com sucesso`);
+    console.log(`✅ Headers adicionados à aba ${AUTOMATION_SHEET_NAME} (após erro)`);
   }
 }
 

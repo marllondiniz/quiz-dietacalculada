@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/leads-automation/process-abandoned",
+      "path": "/api/leads-automation/cron",
       "schedule": "* * * * *"
     }
   ]
