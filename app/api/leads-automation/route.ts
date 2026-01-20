@@ -40,13 +40,19 @@ export async function POST(request: NextRequest) {
 
     console.log('📥 Payload recebido:', JSON.stringify(body, null, 2));
 
+    // Detectar origem pelos HEADERS da Hubla
+    const isHubla = isRequestFromHubla(request);
+    const source: 'hubla' | 'proprio' = isHubla ? 'hubla' : 'proprio';
+
+    console.log(`🔍 Headers Hubla: ${isHubla ? 'SIM' : 'NÃO'}`);
+    console.log(`🔍 Origem: ${source}`);
+
     // Garantir que a aba existe
     await ensureAutomationSheetExists();
 
-    // Detectar origem e tipo de evento
-    const { source, eventType, data } = detectSourceAndEvent(body);
+    // Detectar tipo de evento pelo body
+    const { eventType, data } = detectEventType(body, source);
 
-    console.log(`🔍 Origem: ${source}`);
     console.log(`📋 Tipo de evento: ${eventType}`);
 
     // Executar ação baseada no tipo de evento
@@ -126,13 +132,31 @@ export async function GET() {
 }
 
 // ==========================================
-// DETECÇÃO DE ORIGEM E TIPO DE EVENTO
+// DETECÇÃO DE ORIGEM (pelos headers)
+// ==========================================
+
+/**
+ * Verifica se a requisição vem da Hubla pelos headers
+ */
+function isRequestFromHubla(request: NextRequest): boolean {
+  const hublaToken = request.headers.get('x-hubla-token');
+  const hublaIdempotency = request.headers.get('x-hubla-idempotency');
+  
+  console.log('🔍 Headers:', {
+    'x-hubla-token': hublaToken ? 'presente' : 'ausente',
+    'x-hubla-idempotency': hublaIdempotency ? 'presente' : 'ausente',
+  });
+
+  return !!(hublaToken || hublaIdempotency);
+}
+
+// ==========================================
+// DETECÇÃO DE TIPO DE EVENTO (pelo body)
 // ==========================================
 
 type EventType = 'lead_capture' | 'sale_approved' | 'unknown';
 
-interface DetectedEvent {
-  source: 'hubla' | 'proprio';
+interface DetectedEventData {
   eventType: EventType;
   data: {
     lead_id?: string;
@@ -142,76 +166,50 @@ interface DetectedEvent {
   };
 }
 
-function detectSourceAndEvent(body: any): DetectedEvent {
-  // ========================================
-  // HUBLA - Detecta pelo formato (type + event + version)
-  // ========================================
-  if (body.type && body.event && body.version) {
-    return detectHublaEvent(body);
+function detectEventType(body: any, source: 'hubla' | 'proprio'): DetectedEventData {
+  if (source === 'hubla') {
+    return detectHublaEventType(body);
   }
-
-  // ========================================
-  // SISTEMA PRÓPRIO
-  // ========================================
-  return detectProprioEvent(body);
+  return detectProprioEventType(body);
 }
 
-function detectHublaEvent(body: any): DetectedEvent {
-  const hublaType = body.type?.toLowerCase() || '';
+function detectHublaEventType(body: any): DetectedEventData {
+  const hublaType = (body.type || '').toLowerCase();
   
   // Tipos de evento da Hubla para CAPTURA DE LEAD
-  const leadCaptureTypes = [
-    'lead.created',
-    'lead.abandoned_checkout',
-    'lead.updated',
-  ];
+  const isLeadCapture = 
+    hublaType.includes('lead') ||
+    hublaType.includes('abandoned');
 
   // Tipos de evento da Hubla para VENDA APROVADA
-  const saleApprovedTypes = [
-    'invoice.payment.approved',
-    'invoice.paid',
-    'sale.created',
-    'sale.completed',
-    'purchase.approved',
-    'purchase.completed',
-    'payment.approved',
-    'payment.confirmed',
-    'subscription.created',
-    'subscription.activated',
-  ];
+  const isSaleApproved = 
+    hublaType.includes('payment') ||
+    hublaType.includes('invoice') ||
+    hublaType.includes('sale') ||
+    hublaType.includes('purchase') ||
+    hublaType.includes('subscription');
 
-  // Extrair dados do lead/customer
+  // Extrair dados
   const data = extractHublaData(body);
 
-  // Determinar tipo de evento
   let eventType: EventType = 'unknown';
-
-  if (leadCaptureTypes.some(t => hublaType.includes(t.replace('.', '')))) {
+  if (isLeadCapture) {
     eventType = 'lead_capture';
-  } else if (saleApprovedTypes.some(t => hublaType.includes(t.replace('.', '')))) {
-    eventType = 'sale_approved';
-  } else if (hublaType.includes('lead')) {
-    eventType = 'lead_capture';
-  } else if (hublaType.includes('payment') || hublaType.includes('sale') || hublaType.includes('invoice') || hublaType.includes('purchase')) {
+  } else if (isSaleApproved) {
     eventType = 'sale_approved';
   }
 
-  console.log(`📋 Hubla event type: ${body.type} → ${eventType}`);
+  console.log(`📋 Hubla type "${body.type}" → ${eventType}`);
 
-  return {
-    source: 'hubla',
-    eventType,
-    data,
-  };
+  return { eventType, data };
 }
 
-function detectProprioEvent(body: any): DetectedEvent {
-  const action = body.action?.toLowerCase();
+function detectProprioEventType(body: any): DetectedEventData {
+  const action = (body.action || '').toLowerCase();
 
-  // Se tem action explícito, usar
+  // Venda aprovada
   if (action === 'sale' || action === 'venda' || action === 'purchase') {
     return {
-      source: 'proprio',
       eventType: 'sale_approved',
       data: {
         email: body.email?.trim().toLowerCase(),
@@ -222,7 +220,6 @@ function detectProprioEvent(body: any): DetectedEvent {
 
   // Default: captura de lead
   return {
-    source: 'proprio',
     eventType: 'lead_capture',
     data: {
       lead_id: body.lead_id,
