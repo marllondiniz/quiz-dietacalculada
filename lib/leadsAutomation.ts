@@ -289,6 +289,7 @@ export async function upsertLead(data: {
   FirstName: string;
   email: string;
   phone: string;
+  checkout_source?: CheckoutSource;
 }): Promise<{ success: boolean; lead_id: string; isNew: boolean }> {
   const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
 
@@ -333,6 +334,14 @@ export async function upsertLead(data: {
       });
     }
 
+    // Atualizar checkout_source se fornecido e não existir
+    if (!existingLead.checkout_source && data.checkout_source) {
+      updates.push({
+        range: `${AUTOMATION_SHEET_NAME}!${AUTOMATION_COLUMNS.checkout_source}${rowIndex}`,
+        values: [[data.checkout_source]],
+      });
+    }
+
     if (updates.length > 0) {
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
@@ -357,15 +366,15 @@ export async function upsertLead(data: {
   const timestamp = generateISOTimestamp();
 
   const newRow = [
-    newLeadId,           // lead_id
-    data.FirstName,      // FirstName
-    data.email,          // email
-    data.phone,          // phone
-    timestamp,           // created_at (ISO format para cálculos)
-    'false',             // purchased
-    'false',             // zaia_sent
-    '',                  // checkout_source
-    '',                  // purchase_at
+    newLeadId,                    // lead_id
+    data.FirstName,               // FirstName
+    data.email,                   // email
+    data.phone,                   // phone
+    timestamp,                    // created_at (ISO format para cálculos)
+    'false',                      // purchased
+    'false',                      // zaia_sent
+    data.checkout_source || '',   // checkout_source
+    '',                           // purchase_at
   ];
 
   await sheets.spreadsheets.values.append({

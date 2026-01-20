@@ -287,12 +287,13 @@ async function handleLeadCapture(
     }, { status: 400 });
   }
 
-  // Criar/atualizar lead
+  // Criar/atualizar lead (com checkout_source)
   const result = await upsertLead({
     lead_id,
     FirstName: FirstName.trim(),
     email: email || '',
     phone: phone || '',
+    checkout_source: source === 'hubla' ? 'hubla' : 'proprio',
   });
 
   console.log(`✅ Lead capturado (${source}):`, result);
