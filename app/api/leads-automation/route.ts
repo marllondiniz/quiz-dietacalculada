@@ -230,7 +230,7 @@ function detectProprioEventType(body: any): DetectedEventData {
   };
 }
 
-function extractHublaData(body: any): DetectedEvent['data'] {
+function extractHublaData(body: any): DetectedEventData['data'] {
   const event = body.event || {};
   const lead = event.lead || {};
   const customer = event.customer || event.buyer || event.user || {};
@@ -261,7 +261,7 @@ function normalizePhone(phone: any): string | undefined {
 // ==========================================
 
 async function handleLeadCapture(
-  data: DetectedEvent['data'],
+  data: DetectedEventData['data'],
   source: 'hubla' | 'proprio'
 ): Promise<NextResponse> {
   const { lead_id, FirstName, email, phone } = data;
@@ -309,7 +309,7 @@ async function handleLeadCapture(
 }
 
 async function handleSaleApproved(
-  data: DetectedEvent['data'],
+  data: DetectedEventData['data'],
   source: 'hubla' | 'proprio'
 ): Promise<NextResponse> {
   const { email, phone } = data;
