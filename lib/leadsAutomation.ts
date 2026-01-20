@@ -545,26 +545,57 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
     'https://api.zaia.app/v1/webhook/agent-incoming-webhook-event/create?agentIncomingWebhookId=5437&key=a2fda80e-faac-41f1-9b0c-eb6544adaa93';
 
   try {
+    // Formatar telefone removendo caracteres especiais
+    const phoneClean = lead.phone.replace(/\D/g, '');
+    
+    // Garantir que o telefone tem DDD (adicionar +55 se necessário)
+    let formattedPhone = phoneClean;
+    if (!phoneClean.startsWith('55') && phoneClean.length >= 10) {
+      formattedPhone = '55' + phoneClean;
+    }
+
+    const payload = {
+      FirstName: lead.FirstName,
+      phone: formattedPhone,
+    };
+
+    console.log('📤 Enviando para Zaia:', payload);
+
     const response = await fetch(ZAIA_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        FirstName: lead.FirstName,
-        phone: lead.phone,
-      }),
+      body: JSON.stringify(payload),
     });
 
+    // Tentar ler a resposta
+    let responseBody;
+    try {
+      responseBody = await response.text();
+      console.log(`📥 Resposta Zaia [${response.status}]:`, responseBody);
+    } catch (e) {
+      console.log(`📥 Resposta Zaia [${response.status}]: (sem body)`);
+    }
+
     if (!response.ok) {
-      console.error(`❌ Erro ao enviar para Zaia: ${response.status} ${response.statusText}`);
+      console.error(`❌ Erro Zaia [${response.status}]:`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseBody,
+        lead: { FirstName: lead.FirstName, phone: formattedPhone },
+      });
       return false;
     }
 
-    console.log(`✅ Lead enviado para Zaia: ${lead.FirstName} (${lead.phone})`);
+    console.log(`✅ Lead enviado para Zaia: ${lead.FirstName} (${formattedPhone})`);
     return true;
-  } catch (error) {
-    console.error('❌ Erro ao enviar para Zaia:', error);
+  } catch (error: any) {
+    console.error('❌ Erro ao enviar para Zaia:', {
+      error: error.message,
+      stack: error.stack,
+      lead: { FirstName: lead.FirstName, phone: lead.phone },
+    });
     return false;
   }
 }
