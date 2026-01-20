@@ -473,7 +473,49 @@ export async function markLeadAsZaiaSent(rowIndex: number): Promise<void> {
 }
 
 /**
+ * Marca TODOS os leads com o mesmo telefone como zaia_sent
+ * Evita envios duplicados para o mesmo número
+ */
+export async function markAllLeadsWithPhoneAsZaiaSent(phone: string): Promise<void> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  const normalizedPhone = phone.replace(/\D/g, '');
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+  });
+
+  const rows = response.data.values || [];
+  const updates: { range: string; values: string[][] }[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowPhone = (row[COLUMN_INDEXES.phone] || '').replace(/\D/g, '');
+    const zaiaSent = row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true';
+
+    if (rowPhone === normalizedPhone && !zaiaSent) {
+      updates.push({
+        range: `${AUTOMATION_SHEET_NAME}!${AUTOMATION_COLUMNS.zaia_sent}${i + 1}`,
+        values: [['true']],
+      });
+    }
+  }
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: updates,
+      },
+    });
+    console.log(`✅ ${updates.length} leads com telefone ${phone} marcados como zaia_sent`);
+  }
+}
+
+/**
  * Busca leads elegíveis para abandono (5+ minutos sem compra e não enviados)
+ * Evita duplicatas por telefone (envia apenas uma vez por telefone único)
  */
 export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
   Array<{ lead: AutomationLead; rowIndex: number }>
@@ -490,6 +532,11 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
   const rows = response.data.values || [];
   const now = new Date();
   const abandonedLeads: Array<{ lead: AutomationLead; rowIndex: number }> = [];
+  const processedPhones = new Set<string>(); // Rastrear telefones já processados
+  
+  // Telefone de teste (apenas em desenvolvimento)
+  const TEST_PHONE = process.env.ZAIA_TEST_PHONE || '27992338038';
+  const isTestMode = process.env.NODE_ENV === 'development';
 
   // Pular header
   for (let i = 1; i < rows.length; i++) {
@@ -498,9 +545,24 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
     const purchased = row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true';
     const zaiaSent = row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true';
     const createdAt = row[COLUMN_INDEXES.created_at];
+    const phone = row[COLUMN_INDEXES.phone] || '';
+
+    // Normalizar telefone para comparação (remover caracteres especiais)
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    // Em modo de teste, filtrar apenas o telefone de teste
+    if (isTestMode && normalizedPhone !== TEST_PHONE.replace(/\D/g, '')) {
+      continue;
+    }
 
     // Pular se já comprou ou já foi enviado para Zaia
     if (purchased || zaiaSent) {
+      continue;
+    }
+
+    // Pular se já processamos este telefone (evitar duplicatas)
+    if (normalizedPhone && processedPhones.has(normalizedPhone)) {
+      console.log(`⏭️ Telefone ${normalizedPhone} já processado, pulando duplicata`);
       continue;
     }
 
@@ -515,7 +577,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
           lead_id: row[COLUMN_INDEXES.lead_id] || '',
           FirstName: row[COLUMN_INDEXES.FirstName] || '',
           email: row[COLUMN_INDEXES.email] || '',
-          phone: row[COLUMN_INDEXES.phone] || '',
+          phone: phone,
           created_at: createdAt,
           purchased: false,
           zaia_sent: false,
@@ -529,9 +591,18 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
             lead,
             rowIndex: i + 1, // 1-indexed
           });
+          
+          // Marcar telefone como processado (evitar duplicatas)
+          if (normalizedPhone) {
+            processedPhones.add(normalizedPhone);
+          }
         }
       }
     }
+  }
+
+  if (isTestMode) {
+    console.log(`🧪 MODO TESTE: Filtrando apenas telefone ${TEST_PHONE}`);
   }
 
   return abandonedLeads;

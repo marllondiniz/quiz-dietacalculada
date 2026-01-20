@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { 
   getAbandonedLeads, 
   sendToZaia, 
-  markLeadAsZaiaSent 
+  markLeadAsZaiaSent,
+  markAllLeadsWithPhoneAsZaiaSent
 } from '@/lib/leadsAutomation';
 
 // Força execução dinâmica
@@ -60,7 +61,12 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
         const success = await sendToZaia(lead);
 
         if (success) {
+          // Marcar o lead atual
           await markLeadAsZaiaSent(rowIndex);
+          
+          // Marcar TODOS os outros leads com o mesmo telefone (evitar duplicatas)
+          await markAllLeadsWithPhoneAsZaiaSent(lead.phone);
+          
           sent++;
           console.log(`✅ Enviado: ${lead.FirstName} (${lead.phone})`);
         } else {
