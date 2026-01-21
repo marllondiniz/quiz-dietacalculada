@@ -51,6 +51,28 @@ export default function ContactInfoStep() {
         },
         `lead_${Date.now()}_${Math.random().toString(36).substring(7)}`
       );
+
+      // ✅ CAPTURAR LEAD PARA AUTOMAÇÃO DA ZAIA
+      // Se não comprar em 5 minutos, a Zaia enviará mensagem
+      fetch('/api/leads-automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'capture',
+          FirstName: trimmedName,
+          email: trimmedEmail,
+          phone: trimmedPhone,
+        }),
+      })
+        .then(async (res) => {
+          const json = await res.json().catch(() => null);
+          if (!res.ok) {
+            console.error('❌ Erro ao capturar lead na automação:', json);
+            return;
+          }
+          console.log('✅ Lead capturado para automação Zaia:', json);
+        })
+        .catch((err) => console.error('❌ Falha na requisição de automação:', err));
       
       nextStep();
       router.push(`/quiz/${currentStep + 1}`);

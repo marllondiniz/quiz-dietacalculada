@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { 
   getAbandonedLeads, 
   sendToZaia, 
-  markLeadAsZaiaSent 
+  markLeadAsZaiaSent,
+  markAllLeadsWithPhoneAsZaiaSent
 } from '@/lib/leadsAutomation';
 
 // Força execução dinâmica
@@ -39,8 +40,14 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
 
     console.log('🔄 Processando leads abandonados...');
 
-    // Buscar leads elegíveis (5+ minutos)
-    const abandonedLeads = await getAbandonedLeads(5);
+    // Permite override do limiar por query param (útil para teste local)
+    // Ex: /api/leads-automation/cron?minutes=0
+    const minutesParam = request.nextUrl.searchParams.get('minutes');
+    const minutes =
+      minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 5;
+
+    // Buscar leads elegíveis (minutes+ minutos)
+    const abandonedLeads = await getAbandonedLeads(minutes);
 
     console.log(`📊 ${abandonedLeads.length} leads abandonados encontrados`);
 
@@ -60,7 +67,12 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
         const success = await sendToZaia(lead);
 
         if (success) {
+          // Marcar o lead atual
           await markLeadAsZaiaSent(rowIndex);
+          
+          // Marcar TODOS os outros leads com o mesmo telefone (evitar duplicatas)
+          await markAllLeadsWithPhoneAsZaiaSent(lead.phone);
+          
           sent++;
           console.log(`✅ Enviado: ${lead.FirstName} (${lead.phone})`);
         } else {

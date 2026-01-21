@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { upsertLead } from '@/lib/leadsAutomation';
 
 /**
  * API de Checkout Split Controlado Globalmente
@@ -433,6 +434,23 @@ export async function POST(request: NextRequest) {
         requestBody: { values },
       });
       console.log('✅ Nova linha criada com sucesso');
+    }
+
+    // ✅ SINCRONIZAR COM LEADS_AUTOMACAO (para automação da Zaia)
+    // Garante que quem completou o quiz também entra na aba de automação
+    if (quizData.name && (quizData.email || quizData.phone)) {
+      try {
+        const syncResult = await upsertLead({
+          lead_id: quizData.leadId || undefined,
+          FirstName: quizData.name,
+          email: quizData.email || '',
+          phone: quizData.phone || '',
+          checkout_source: variant === 'hubla' ? 'hubla' : 'proprio',
+        });
+        console.log('✅ Sincronizado com Leads_Automacao:', syncResult);
+      } catch (syncError) {
+        console.error('⚠️ Erro ao sincronizar com Leads_Automacao (não bloqueante):', syncError);
+      }
     }
 
     // Liberar lock

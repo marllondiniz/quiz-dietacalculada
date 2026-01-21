@@ -119,7 +119,6 @@ export async function ensureAutomationSheetExists(): Promise<void> {
       },
     });
 
-    console.log(`✅ Aba ${AUTOMATION_SHEET_NAME} criada`);
   }
 
   // Verificar se os headers existem (primeira linha)
@@ -141,8 +140,6 @@ export async function ensureAutomationSheetExists(): Promise<void> {
           values: [AUTOMATION_HEADERS],
         },
       });
-
-      console.log(`✅ Headers adicionados à aba ${AUTOMATION_SHEET_NAME}`);
     }
   } catch (error) {
     // Se der erro ao ler, provavelmente a aba está vazia, adicionar headers
@@ -154,8 +151,6 @@ export async function ensureAutomationSheetExists(): Promise<void> {
         values: [AUTOMATION_HEADERS],
       },
     });
-
-    console.log(`✅ Headers adicionados à aba ${AUTOMATION_SHEET_NAME} (após erro)`);
   }
 }
 
@@ -352,8 +347,6 @@ export async function upsertLead(data: {
       });
     }
 
-    console.log(`✅ Lead atualizado: ${existingLead.lead_id || data.lead_id}`);
-
     return {
       success: true,
       lead_id: existingLead.lead_id || data.lead_id || '',
@@ -386,8 +379,6 @@ export async function upsertLead(data: {
       values: [newRow],
     },
   });
-
-  console.log(`✅ Novo lead criado: ${newLeadId}`);
 
   return {
     success: true,
@@ -446,8 +437,6 @@ export async function markLeadAsPurchased(
     },
   });
 
-  console.log(`✅ Lead marcado como comprado: ${lead.email || lead.phone}`);
-
   return {
     success: true,
     message: 'Lead marcado como comprado',
@@ -469,11 +458,51 @@ export async function markLeadAsZaiaSent(rowIndex: number): Promise<void> {
     },
   });
 
-  console.log(`✅ Lead marcado como enviado para Zaia (linha ${rowIndex})`);
+}
+
+/**
+ * Marca TODOS os leads com o mesmo telefone como zaia_sent
+ * Evita envios duplicados para o mesmo número
+ */
+export async function markAllLeadsWithPhoneAsZaiaSent(phone: string): Promise<void> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  const normalizedPhone = phone.replace(/\D/g, '');
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+  });
+
+  const rows = response.data.values || [];
+  const updates: { range: string; values: string[][] }[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowPhone = (row[COLUMN_INDEXES.phone] || '').replace(/\D/g, '');
+    const zaiaSent = row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true';
+
+    if (rowPhone === normalizedPhone && !zaiaSent) {
+      updates.push({
+        range: `${AUTOMATION_SHEET_NAME}!${AUTOMATION_COLUMNS.zaia_sent}${i + 1}`,
+        values: [['true']],
+      });
+    }
+  }
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: updates,
+      },
+    });
+  }
 }
 
 /**
  * Busca leads elegíveis para abandono (5+ minutos sem compra e não enviados)
+ * Evita duplicatas por telefone (envia apenas uma vez por telefone único)
  */
 export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
   Array<{ lead: AutomationLead; rowIndex: number }>
@@ -490,6 +519,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
   const rows = response.data.values || [];
   const now = new Date();
   const abandonedLeads: Array<{ lead: AutomationLead; rowIndex: number }> = [];
+  const processedPhones = new Set<string>(); // Rastrear telefones já processados
 
   // Pular header
   for (let i = 1; i < rows.length; i++) {
@@ -498,9 +528,18 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
     const purchased = row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true';
     const zaiaSent = row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true';
     const createdAt = row[COLUMN_INDEXES.created_at];
+    const phone = row[COLUMN_INDEXES.phone] || '';
+
+    // Normalizar telefone para comparação
+    const normalizedPhone = phone.replace(/\D/g, '');
 
     // Pular se já comprou ou já foi enviado para Zaia
     if (purchased || zaiaSent) {
+      continue;
+    }
+
+    // Pular se já processamos este telefone (evitar duplicatas)
+    if (normalizedPhone && processedPhones.has(normalizedPhone)) {
       continue;
     }
 
@@ -515,7 +554,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
           lead_id: row[COLUMN_INDEXES.lead_id] || '',
           FirstName: row[COLUMN_INDEXES.FirstName] || '',
           email: row[COLUMN_INDEXES.email] || '',
-          phone: row[COLUMN_INDEXES.phone] || '',
+          phone: phone,
           created_at: createdAt,
           purchased: false,
           zaia_sent: false,
@@ -529,6 +568,11 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
             lead,
             rowIndex: i + 1, // 1-indexed
           });
+          
+          // Marcar telefone como processado (evitar duplicatas)
+          if (normalizedPhone) {
+            processedPhones.add(normalizedPhone);
+          }
         }
       }
     }
@@ -545,26 +589,48 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
     'https://api.zaia.app/v1/webhook/agent-incoming-webhook-event/create?agentIncomingWebhookId=5437&key=a2fda80e-faac-41f1-9b0c-eb6544adaa93';
 
   try {
+    // Formatar telefone removendo caracteres especiais
+    const phoneClean = lead.phone.replace(/\D/g, '');
+    
+    // Garantir que o telefone tem DDD (adicionar +55 se necessário)
+    let formattedPhone = phoneClean;
+    if (!phoneClean.startsWith('55') && phoneClean.length >= 10) {
+      formattedPhone = '55' + phoneClean;
+    }
+
+    const payload = {
+      FirstName: lead.FirstName,
+      phone: formattedPhone,
+    };
+
+    // ✅ Modo teste: não envia nada para a Zaia, apenas loga o payload.
+    // Útil para validar o fluxo (quiz → planilha → cron) sem disparar mensagens reais.
+    if ((process.env.ZAIA_DRY_RUN || '').toLowerCase() === 'true') {
+      console.log('🧪 ZAIA_DRY_RUN ativo — simulando envio para Zaia:', payload);
+      return true;
+    }
+
     const response = await fetch(ZAIA_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        FirstName: lead.FirstName,
-        phone: lead.phone,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      console.error(`❌ Erro ao enviar para Zaia: ${response.status} ${response.statusText}`);
+      const responseBody = await response.text();
+      console.error(`❌ Erro ao enviar para Zaia [${response.status}]:`, {
+        lead: { FirstName: lead.FirstName, phone: formattedPhone },
+        error: responseBody,
+      });
       return false;
     }
 
-    console.log(`✅ Lead enviado para Zaia: ${lead.FirstName} (${lead.phone})`);
+    console.log(`✅ Lead enviado para Zaia: ${lead.FirstName} (${formattedPhone})`);
     return true;
-  } catch (error) {
-    console.error('❌ Erro ao enviar para Zaia:', error);
+  } catch (error: any) {
+    console.error('❌ Erro ao enviar para Zaia:', error.message);
     return false;
   }
 }
