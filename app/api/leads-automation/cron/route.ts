@@ -40,8 +40,14 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
 
     console.log('🔄 Processando leads abandonados...');
 
-    // Buscar leads elegíveis (5+ minutos)
-    const abandonedLeads = await getAbandonedLeads(5);
+    // Permite override do limiar por query param (útil para teste local)
+    // Ex: /api/leads-automation/cron?minutes=0
+    const minutesParam = request.nextUrl.searchParams.get('minutes');
+    const minutes =
+      minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 5;
+
+    // Buscar leads elegíveis (minutes+ minutos)
+    const abandonedLeads = await getAbandonedLeads(minutes);
 
     console.log(`📊 ${abandonedLeads.length} leads abandonados encontrados`);
 

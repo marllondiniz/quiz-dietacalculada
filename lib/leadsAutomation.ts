@@ -603,6 +603,13 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
       phone: formattedPhone,
     };
 
+    // ✅ Modo teste: não envia nada para a Zaia, apenas loga o payload.
+    // Útil para validar o fluxo (quiz → planilha → cron) sem disparar mensagens reais.
+    if ((process.env.ZAIA_DRY_RUN || '').toLowerCase() === 'true') {
+      console.log('🧪 ZAIA_DRY_RUN ativo — simulando envio para Zaia:', payload);
+      return true;
+    }
+
     const response = await fetch(ZAIA_WEBHOOK_URL, {
       method: 'POST',
       headers: {
