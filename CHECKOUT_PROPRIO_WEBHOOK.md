@@ -2,7 +2,8 @@
 
 ## Configuração
 
-Quando o pagamento for aprovado no **checkout.dietacalculada.com**, configure o webhook/callback para chamar:
+Quando o pagamento for aprovado no **checkout.dietacalculada.com**, configure o
+webhook/callback para chamar:
 
 ```
 POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio
@@ -12,21 +13,24 @@ POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio
 
 ```json
 {
-  "email": "cliente@email.com",
-  "phone": "11999999999",
-  "transaction_id": "tx_123",
-  "amount": 99.90,
-  "plan": "annual"
+    "email": "cliente@email.com",
+    "phone": "11999999999",
+    "transaction_id": "tx_123",
+    "amount": 99.90,
+    "plan": "annual"
 }
 ```
 
 ### Campos obrigatórios
+
 - `email` (string) - Email do cliente **OU**
 - `phone` (string) - Telefone do cliente
 
-**Importante**: Pelo menos um dos dois (email ou phone) é obrigatório para identificar o lead.
+**Importante**: Pelo menos um dos dois (email ou phone) é obrigatório para
+identificar o lead.
 
 ### Campos opcionais
+
 - `transaction_id` - ID da transação do gateway
 - `amount` - Valor pago
 - `plan` - Plano contratado (annual/monthly)
@@ -35,15 +39,15 @@ POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio
 
 ```json
 {
-  "success": true,
-  "message": "Venda registrada com sucesso",
-  "data": {
     "success": true,
-    "message": "Venda registrada",
-    "checkout_source": "proprio",
-    "source": "proprio",
-    "event": "sale_approved"
-  }
+    "message": "Venda registrada com sucesso",
+    "data": {
+        "success": true,
+        "message": "Venda registrada",
+        "checkout_source": "proprio",
+        "source": "proprio",
+        "event": "sale_approved"
+    }
 }
 ```
 
@@ -57,6 +61,7 @@ POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio
 ## Testando o webhook
 
 ### Via curl (local)
+
 ```bash
 curl -X POST http://localhost:3000/api/webhook/checkout-proprio \
   -H "Content-Type: application/json" \
@@ -70,6 +75,7 @@ curl -X POST http://localhost:3000/api/webhook/checkout-proprio \
 ```
 
 ### Via curl (produção)
+
 ```bash
 curl -X POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio \
   -H "Content-Type: application/json" \
@@ -85,6 +91,7 @@ curl -X POST https://quiz.dietacalculada.com/api/webhook/checkout-proprio \
 ## Logs
 
 Para debug, verifique os logs da Vercel. Você verá:
+
 - `📥 Webhook checkout próprio recebido:` - payload recebido
 - `✅ Venda registrada com sucesso:` - sucesso
 - `❌ Erro ao registrar venda:` - erro (lead não encontrado ou outro problema)
@@ -92,6 +99,7 @@ Para debug, verifique os logs da Vercel. Você verá:
 ## Documentação do endpoint
 
 Para ver a documentação JSON do endpoint:
+
 ```
 GET https://quiz.dietacalculada.com/api/webhook/checkout-proprio
 ```
