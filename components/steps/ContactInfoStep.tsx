@@ -51,7 +51,7 @@ export default function ContactInfoStep() {
         },
         `lead_${Date.now()}_${Math.random().toString(36).substring(7)}`
       );
-
+      
       // ✅ CAPTURAR LEAD PARA AUTOMAÇÃO DA ZAIA
       // Se não comprar em 5 minutos, a Zaia enviará mensagem
       fetch('/api/leads-automation', {
