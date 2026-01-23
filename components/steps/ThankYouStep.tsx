@@ -84,11 +84,10 @@ export default function ThankYouStep() {
       const result = await response.json();
 
       if (result.success && result.checkout_url) {
-        console.log('✅ Checkout split processado:', {
+        console.log('✅ Checkout processado:', {
           variant: result.checkout_variant,
           plan: result.checkout_plan,
-          splitVersion: result.split_version,
-          cycleInfo: result.cycle_info,
+          checkoutVersion: result.checkout_version,
         });
         
         // Redirecionar para o checkout
