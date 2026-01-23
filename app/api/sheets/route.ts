@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       body.checkout_variant || '',                  // V - Step 23: Checkout Variant
       body.checkout_plan || '',                     // W - Step 23: Checkout Plan
       body.checkout_url || '',                      // X - Step 23: Checkout URL
-      body.split_version || '',                     // Y - Step 23: Split Version
+      body.checkout_version || body.split_version || '', // Y - Step 23: Checkout Version
       body.referralCode || '',                      // Z - Código Referência
       body.heardFrom || '',                         // AA - Onde Ouviu
       body.addBurnedCalories ? 'Sim' : 'Não',      // AB - Add Calorias

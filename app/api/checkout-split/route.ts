@@ -3,53 +3,31 @@ import { google } from 'googleapis';
 import { upsertLead } from '@/lib/leadsAutomation';
 
 /**
- * API de Checkout Split Controlado Globalmente
+ * API de Checkout - Apenas Hubla
  * 
- * Estratégia: Contador global no Google Sheets
- * - Exatamente 2 em cada 10 vão para "proprio"
- * - 8 em cada 10 vão para "hubla"
- * - Slots fixos: posições 3 e 7 (0-indexed: 2 e 6) são "proprio"
+ * Todos os usuários são redirecionados para o checkout Hubla.
  */
 
-export type CheckoutVariant = 'hubla' | 'proprio';
+export type CheckoutVariant = 'hubla';
 export type PlanType = 'annual' | 'monthly';
 
-const SPLIT_VERSION = '80_20_controlado_v1';
-const CONFIG_SHEET_NAME = 'Config';
+const CHECKOUT_VERSION = 'hubla_only_v1';
 const DATA_SHEET_NAME = 'Página1';
 
-// Slots fixos para "proprio" (0-indexed): posições 3 e 7 no ciclo de 10
-const PROPRIO_SLOTS = [2, 6]; // 0-indexed: slots 3 e 7
-const CYCLE_SIZE = 10;
-
-// URLs de checkout
+// URLs de checkout Hubla
 const CHECKOUT_URLS = {
   hubla: {
     annual: 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD',
     monthly: 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy',
   },
-  proprio: {
-    annual: 'https://checkout.dietacalculada.com?plan=annual',
-    monthly: 'https://checkout.dietacalculada.com?plan=monthly',
-  },
 };
-
-interface CycleState {
-  cycle_index: number;      // 0-9: posição atual no ciclo
-  locked: boolean;          // Se está sendo processado
-  last_update: string;      // Timestamp da última atualização
-}
 
 interface CheckoutSuccessResponse {
   success: true;
   checkout_variant: CheckoutVariant;
   checkout_plan: PlanType;
   checkout_url: string;
-  split_version: string;
-  cycle_info?: {
-    cycle_index: number;
-    is_proprio_slot: boolean;
-  };
+  checkout_version: string;
 }
 
 interface CheckoutErrorResponse {
@@ -71,154 +49,9 @@ async function getGoogleSheetsClient() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function ensureConfigSheet(sheets: any, spreadsheetId: string): Promise<void> {
-  try {
-    // Verificar se a aba Config existe
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-    const configSheet = spreadsheet.data.sheets?.find(
-      (s: any) => s.properties?.title === CONFIG_SHEET_NAME
-    );
 
-    if (!configSheet) {
-      console.log('📋 Criando aba Config...');
-      
-      // Criar a aba Config
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [{
-            addSheet: {
-              properties: {
-                title: CONFIG_SHEET_NAME,
-              },
-            },
-          }],
-        },
-      });
-
-      // Inicializar com valores padrão
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${CONFIG_SHEET_NAME}!A1:B4`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [
-            ['cycle_index', '0'],
-            ['locked', 'FALSE'],
-            ['last_update', new Date().toISOString()],
-            ['split_version', SPLIT_VERSION],
-          ],
-        },
-      });
-
-      console.log('✅ Aba Config criada e inicializada');
-    }
-  } catch (error) {
-    console.error('Erro ao verificar/criar aba Config:', error);
-    throw error;
-  }
-}
-
-async function getCycleState(sheets: any, spreadsheetId: string): Promise<CycleState> {
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${CONFIG_SHEET_NAME}!A1:B4`,
-  });
-
-  const rows = response.data.values || [];
-  const state: CycleState = {
-    cycle_index: 0,
-    locked: false,
-    last_update: new Date().toISOString(),
-  };
-
-  rows.forEach((row: string[]) => {
-    if (row[0] === 'cycle_index') state.cycle_index = parseInt(row[1]) || 0;
-    if (row[0] === 'locked') state.locked = row[1] === 'TRUE';
-    if (row[0] === 'last_update') state.last_update = row[1];
-  });
-
-  return state;
-}
-
-async function acquireLock(sheets: any, spreadsheetId: string, maxRetries = 5): Promise<boolean> {
-  for (let i = 0; i < maxRetries; i++) {
-    const state = await getCycleState(sheets, spreadsheetId);
-    
-    // Verificar se o lock está "preso" (mais de 30 segundos)
-    const lastUpdate = new Date(state.last_update).getTime();
-    const now = Date.now();
-    const lockStale = (now - lastUpdate) > 30000; // 30 segundos
-    
-    if (!state.locked || lockStale) {
-      // Tentar adquirir o lock
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${CONFIG_SHEET_NAME}!B2:B3`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [
-            ['TRUE'],
-            [new Date().toISOString()],
-          ],
-        },
-      });
-      
-      // Verificar se conseguimos o lock (double-check)
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const checkState = await getCycleState(sheets, spreadsheetId);
-      
-      if (checkState.locked) {
-        console.log('🔒 Lock adquirido');
-        return true;
-      }
-    }
-    
-    // Esperar antes de tentar novamente
-    console.log(`⏳ Lock ocupado, tentativa ${i + 1}/${maxRetries}...`);
-    await new Promise(resolve => setTimeout(resolve, 200 * (i + 1)));
-  }
-  
-  return false;
-}
-
-async function releaseLock(sheets: any, spreadsheetId: string): Promise<void> {
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${CONFIG_SHEET_NAME}!B2:B3`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [
-        ['FALSE'],
-        [new Date().toISOString()],
-      ],
-    },
-  });
-  console.log('🔓 Lock liberado');
-}
-
-async function updateCycleIndex(sheets: any, spreadsheetId: string, newIndex: number): Promise<void> {
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${CONFIG_SHEET_NAME}!B1`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [[newIndex.toString()]],
-    },
-  });
-}
-
-function determineVariant(cycleIndex: number): CheckoutVariant {
-  // Slots fixos para "proprio": posições 2 e 6 (0-indexed)
-  // Isso garante EXATAMENTE 2 em cada 10
-  if (PROPRIO_SLOTS.includes(cycleIndex)) {
-    return 'proprio';
-  }
-  return 'hubla';
-}
-
-function buildCheckoutUrl(variant: CheckoutVariant, plan: PlanType, utmParams: Record<string, string>): string {
-  const baseUrl = CHECKOUT_URLS[variant][plan];
+function buildCheckoutUrl(plan: PlanType, utmParams: Record<string, string>): string {
+  const baseUrl = CHECKOUT_URLS.hubla[plan];
   
   const params = new URLSearchParams();
   Object.entries(utmParams).forEach(([key, value]) => {
@@ -246,7 +79,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let lockAcquired = false;
   let sheets: any;
 
   try {
@@ -262,40 +94,11 @@ export async function POST(request: NextRequest) {
 
     sheets = await getGoogleSheetsClient();
     
-    // Garantir que a aba Config existe
-    await ensureConfigSheet(sheets, spreadsheetId);
+    // Sempre usar Hubla
+    const variant: CheckoutVariant = 'hubla';
+    const checkoutUrl = buildCheckoutUrl(plan, utmParams);
     
-    // Adquirir lock para evitar condição de corrida
-    lockAcquired = await acquireLock(sheets, spreadsheetId);
-    
-    if (!lockAcquired) {
-      console.error('❌ Não foi possível adquirir lock após várias tentativas');
-      // Em caso de falha no lock, usar fallback aleatório
-      const fallbackVariant: CheckoutVariant = Math.random() < 0.8 ? 'hubla' : 'proprio';
-      const fallbackUrl = buildCheckoutUrl(fallbackVariant, plan, utmParams);
-      
-      return NextResponse.json({
-        success: true,
-        checkout_variant: fallbackVariant,
-        checkout_plan: plan,
-        checkout_url: fallbackUrl,
-        split_version: SPLIT_VERSION + '_fallback',
-      } as CheckoutResponse);
-    }
-
-    // Ler estado atual do ciclo
-    const state = await getCycleState(sheets, spreadsheetId);
-    const currentIndex = state.cycle_index;
-    
-    // Determinar variante baseada no slot atual
-    const variant = determineVariant(currentIndex);
-    const checkoutUrl = buildCheckoutUrl(variant, plan, utmParams);
-    
-    console.log(`🎯 Ciclo ${currentIndex}/${CYCLE_SIZE} => ${variant} (slots proprio: ${PROPRIO_SLOTS.join(', ')})`);
-    
-    // Incrementar o índice do ciclo (0-9, depois volta para 0)
-    const nextIndex = (currentIndex + 1) % CYCLE_SIZE;
-    await updateCycleIndex(sheets, spreadsheetId, nextIndex);
+    console.log(`🎯 Checkout Hubla - Plano: ${plan}`);
     
     // Preparar dados para salvar na planilha principal
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -399,7 +202,7 @@ export async function POST(request: NextRequest) {
       variant,                                      // V - Step 23: Checkout Variant
       plan,                                         // W - Step 23: Checkout Plan
       checkoutUrl,                                  // X - Step 23: Checkout URL
-      SPLIT_VERSION,                                // Y - Step 23: Split Version
+      CHECKOUT_VERSION,                             // Y - Step 23: Checkout Version
       quizData.referralCode || '',                  // Z - Código Referência
       quizData.heardFrom || '',                     // AA - Onde Ouviu
       quizData.addBurnedCalories ? 'Sim' : 'Não',   // AB - Add Calorias
@@ -445,7 +248,7 @@ export async function POST(request: NextRequest) {
           FirstName: quizData.name,
           email: quizData.email || '',
           phone: quizData.phone || '',
-          checkout_source: variant === 'hubla' ? 'hubla' : 'proprio',
+          checkout_source: 'hubla',
         });
         console.log('✅ Sincronizado com Leads_Automacao:', syncResult);
       } catch (syncError) {
@@ -453,33 +256,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Liberar lock
-    await releaseLock(sheets, spreadsheetId);
-    lockAcquired = false;
-
     return NextResponse.json({
       success: true,
       checkout_variant: variant,
       checkout_plan: plan,
       checkout_url: checkoutUrl,
-      split_version: SPLIT_VERSION,
-      cycle_info: {
-        cycle_index: currentIndex,
-        is_proprio_slot: PROPRIO_SLOTS.includes(currentIndex),
-      },
+      checkout_version: CHECKOUT_VERSION,
     } as CheckoutResponse);
 
   } catch (error: any) {
-    console.error('❌ Erro no checkout split:', error);
-    
-    // Garantir que o lock seja liberado em caso de erro
-    if (lockAcquired && sheets) {
-      try {
-        await releaseLock(sheets, spreadsheetId);
-      } catch (e) {
-        console.error('Erro ao liberar lock:', e);
-      }
-    }
+    console.error('❌ Erro no checkout:', error);
 
     return NextResponse.json(
       { 

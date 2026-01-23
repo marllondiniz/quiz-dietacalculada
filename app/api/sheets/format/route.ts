@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
       'Obstáculos',             // S - Step 15
       'Tipo Dieta',             // T - Step 16
       'Conquistas',             // U - Step 17
-      'Checkout Variant',       // V - Step 23 (hubla/proprio)
+      'Checkout Variant',       // V - Step 23 (hubla)
       'Checkout Plan',          // W - Step 23 (annual/monthly)
       'Checkout URL',           // X - Step 23
-      'Split Version',          // Y - Step 23
+      'Checkout Version',       // Y - Step 23
       'Código Referência',      // Z - Opcional
       'Onde Ouviu',             // AA - Opcional
       'Add Calorias',           // AB - Configuração
