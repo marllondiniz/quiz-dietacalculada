@@ -6,7 +6,10 @@ import {
   ensureAutomationSheetExists,
   AUTOMATION_SHEET_NAME,
   AUTOMATION_HEADERS,
-  CheckoutSource 
+  CheckoutSource,
+  saveSaleToSalesSheet,
+  SaleData,
+  findLeadByEmailOrPhone
 } from '@/lib/leadsAutomation';
 import { 
   leadCaptureSchema, 
@@ -192,6 +195,21 @@ interface DetectedEventData {
     FirstName?: string;
     email?: string;
     phone?: string;
+    // Dados adicionais para vendas
+    transactionId?: string;
+    plan?: string;
+    grossValue?: number;
+    netValue?: number;
+    paymentMethod?: string;
+    offerName?: string;
+    purchaseDate?: string;
+    paymentDate?: string;
+    utmSource?: string;
+    utmCampaign?: string;
+    utmMedium?: string;
+    utmContent?: string;
+    utmTerm?: string;
+    coupon?: string;
   };
 }
 
@@ -261,6 +279,11 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   const event = body.event || {};
   const lead = event.lead || {};
   const customer = event.customer || event.buyer || event.user || {};
+  const invoice = event.invoice || {};
+  const payment = event.payment || invoice.payment || {};
+  const offer = event.offer || event.product || {};
+  const subscription = event.subscription || {};
+  const utm = event.utm || customer.utm || {};
   
   // Prioridade: lead > customer
   const source = lead.email ? lead : customer;
@@ -269,12 +292,61 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   const fullName = source.fullName || source.full_name || source.name || source.nome || '';
   const firstName = fullName.split(' ')[0] || fullName;
 
+  // Extrair valores
+  const grossValue = invoice.total || invoice.amount || payment.amount || event.amount || event.total;
+  const netValue = invoice.netAmount || invoice.net_amount || payment.netAmount || payment.net_amount;
+
+  // Extrair forma de pagamento
+  let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || '';
+  if (paymentMethod) {
+    paymentMethod = mapPaymentMethod(paymentMethod);
+  }
+
+  // Extrair plano (anual/mensal)
+  let plan = offer.name || subscription.plan || event.plan || '';
+  if (!plan && grossValue) {
+    // Inferir plano pelo valor (R$ 99 = anual, R$ 27,90 ou R$ 30,90 = mensal)
+    if (grossValue >= 90) {
+      plan = 'annual';
+    } else {
+      plan = 'monthly';
+    }
+  }
+
   return {
     lead_id: lead.id || source.id,
     FirstName: firstName,
     email: (source.email || '').trim().toLowerCase() || undefined,
     phone: normalizePhone(source.phone || source.telefone),
+    // Dados de venda
+    transactionId: invoice.id || payment.id || event.id || body.id,
+    plan: plan,
+    grossValue: typeof grossValue === 'number' ? grossValue : parseFloat(grossValue) || undefined,
+    netValue: typeof netValue === 'number' ? netValue : parseFloat(netValue) || undefined,
+    paymentMethod: paymentMethod,
+    offerName: offer.name || offer.title || subscription.name || '',
+    purchaseDate: event.createdAt || event.created_at || invoice.createdAt || body.createdAt,
+    paymentDate: payment.paidAt || payment.paid_at || invoice.paidAt || event.paidAt,
+    // UTMs
+    utmSource: utm.source || utm.utm_source || '',
+    utmCampaign: utm.campaign || utm.utm_campaign || '',
+    utmMedium: utm.medium || utm.utm_medium || '',
+    utmContent: utm.content || utm.utm_content || '',
+    utmTerm: utm.term || utm.utm_term || '',
+    coupon: invoice.coupon || payment.coupon || event.coupon || '',
   };
+}
+
+/**
+ * Mapeia método de pagamento para português
+ */
+function mapPaymentMethod(method: string): string {
+  const methodLower = method.toLowerCase();
+  if (methodLower.includes('pix')) return 'PIX';
+  if (methodLower.includes('credit') || methodLower.includes('credito') || methodLower.includes('card')) return 'Cartão de Crédito';
+  if (methodLower.includes('boleto') || methodLower.includes('billet')) return 'Boleto';
+  if (methodLower.includes('debit') || methodLower.includes('debito')) return 'Cartão de Débito';
+  return method;
 }
 
 function normalizePhone(phone: any): string | undefined {
@@ -350,19 +422,67 @@ async function handleSaleApproved(
     });
 
     const checkoutSource: CheckoutSource = source;
+    
+    // 1. Marcar lead como comprado na aba de automação
     const result = await markLeadAsPurchased(
       validatedData.email, 
       validatedData.phone, 
       checkoutSource
     );
 
+    // 2. Buscar dados do lead para pegar nome e UTMs
+    let leadName = data.FirstName || '';
+    let utmSource = data.utmSource || '';
+    let utmCampaign = data.utmCampaign || '';
+    let utmMedium = data.utmMedium || '';
+    let utmContent = data.utmContent || '';
+    let utmTerm = data.utmTerm || '';
+
+    // Buscar dados do lead existente se não tiver nome
+    if (!leadName && (validatedData.email || validatedData.phone)) {
+      try {
+        const { lead } = await findLeadByEmailOrPhone(validatedData.email, validatedData.phone);
+        if (lead) {
+          leadName = lead.FirstName || '';
+        }
+      } catch (err) {
+        console.error('⚠️ Erro ao buscar lead para nome:', err);
+      }
+    }
+
+    // 3. Salvar na aba "Lista Vendas"
+    const saleData: SaleData = {
+      purchaseDate: data.purchaseDate,
+      paymentDate: data.paymentDate,
+      checkout: checkoutSource,
+      transactionId: data.transactionId,
+      plan: data.plan,
+      grossValue: data.grossValue,
+      netValue: data.netValue,
+      paymentMethod: data.paymentMethod,
+      name: leadName,
+      email: validatedData.email || '',
+      phone: validatedData.phone || '',
+      offerName: data.offerName,
+      utmSource: utmSource,
+      utmCampaign: utmCampaign,
+      utmMedium: utmMedium,
+      utmContent: utmContent,
+      utmTerm: utmTerm,
+      coupon: data.coupon,
+    };
+
+    const salesResult = await saveSaleToSalesSheet(saleData);
+    console.log(`📊 Venda salva na aba "Lista Vendas": ${salesResult.success ? '✅' : '❌'}`);
+
     if (!result.success) {
       return NextResponse.json({
-        success: false,
-        message: result.message,
+        success: true, // Ainda retorna sucesso pois salvou na Lista Vendas
+        message: 'Venda salva na Lista Vendas (lead não encontrado na automação)',
+        salesSheetSaved: salesResult.success,
         source,
         event: 'sale_approved',
-        note: 'Lead não encontrado na aba de automação',
+        note: result.message,
       });
     }
 
@@ -370,6 +490,7 @@ async function handleSaleApproved(
       success: true,
       message: 'Venda registrada',
       checkout_source: checkoutSource,
+      salesSheetSaved: salesResult.success,
       source,
       event: 'sale_approved',
     });

@@ -634,3 +634,225 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
     return false;
   }
 }
+
+// ==========================================
+// ABA "LISTA VENDAS"
+// ==========================================
+
+// Nome da aba de vendas
+export const SALES_SHEET_NAME = 'Lista Vendas';
+
+// Headers da aba "Lista Vendas" (18 colunas conforme a planilha)
+export const SALES_HEADERS = [
+  'DATA COMPRA',
+  'DATA PAGAMENTO',
+  'CHECKOUT',
+  'ID TRANSAÇÃO',
+  'PLANO',
+  'VALOR BRUTO',
+  'VALOR LÍQUIDO',
+  'FORMA DE PAGAMENTO',
+  'NOME',
+  'E-MAIL',
+  'TELEFONE',
+  'NOME DA OFERTA',
+  'UTM_SOURCE',
+  'UTM_CAMPAIGN',
+  'UTM_MEDIUM',
+  'UTM_CONTENT',
+  'UTM_TERM',
+  'CUPOM',
+];
+
+/**
+ * Verifica se a aba "Lista Vendas" existe, se não, cria com os headers
+ */
+export async function ensureSalesSheetExists(): Promise<void> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId,
+  });
+
+  const sheetExists = spreadsheet.data.sheets?.some(
+    (sheet) => sheet.properties?.title === SALES_SHEET_NAME
+  );
+
+  if (!sheetExists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: SALES_SHEET_NAME,
+              },
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  try {
+    const headerRow = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${SALES_SHEET_NAME}'!A1:R1`,
+    });
+
+    const existingHeaders = headerRow.data.values?.[0] || [];
+    
+    if (existingHeaders.length === 0 || existingHeaders[0] !== 'DATA COMPRA') {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${SALES_SHEET_NAME}'!A1:R1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [SALES_HEADERS],
+        },
+      });
+    }
+  } catch (error) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${SALES_SHEET_NAME}'!A1:R1`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [SALES_HEADERS],
+      },
+    });
+  }
+}
+
+/**
+ * Interface para dados de venda
+ */
+export interface SaleData {
+  purchaseDate?: string;
+  paymentDate?: string;
+  checkout: 'hubla' | 'cakto';
+  transactionId?: string;
+  plan?: string;
+  grossValue?: number;
+  netValue?: number;
+  paymentMethod?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  offerName?: string;
+  utmSource?: string;
+  utmCampaign?: string;
+  utmMedium?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  coupon?: string;
+}
+
+/**
+ * Formata valor para Real brasileiro
+ */
+function formatCurrency(value?: number): string {
+  if (!value && value !== 0) return '';
+  return `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+/**
+ * Formata data para formato brasileiro
+ */
+function formatDateBR(date?: string | Date): string {
+  if (!date) return '';
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Mapeia plano para nome em português
+ */
+function mapPlanName(plan?: string): string {
+  if (!plan) return '';
+  const planLower = plan.toLowerCase();
+  if (planLower.includes('annual') || planLower.includes('anual')) return 'Anual';
+  if (planLower.includes('monthly') || planLower.includes('mensal')) return 'Mensal';
+  return plan;
+}
+
+/**
+ * Mapeia nome da oferta
+ */
+function mapOfferName(plan?: string, offerName?: string): string {
+  if (offerName) return offerName;
+  if (!plan) return '';
+  const planLower = plan.toLowerCase();
+  if (planLower.includes('annual') || planLower.includes('anual')) return 'Plano Anual';
+  if (planLower.includes('monthly') || planLower.includes('mensal')) return 'Plano Mensal';
+  return plan;
+}
+
+/**
+ * Salva uma venda na aba "Lista Vendas"
+ */
+export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ success: boolean; message: string }> {
+  try {
+    const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+    
+    await ensureSalesSheetExists();
+
+    const now = new Date().toISOString();
+    const row = [
+      formatDateBR(saleData.purchaseDate || now),     // DATA COMPRA
+      formatDateBR(saleData.paymentDate || now),      // DATA PAGAMENTO
+      saleData.checkout.toUpperCase(),                // CHECKOUT
+      saleData.transactionId || '',                   // ID TRANSAÇÃO
+      mapPlanName(saleData.plan),                     // PLANO
+      formatCurrency(saleData.grossValue),            // VALOR BRUTO
+      formatCurrency(saleData.netValue),              // VALOR LÍQUIDO
+      saleData.paymentMethod || '',                   // FORMA DE PAGAMENTO
+      saleData.name || '',                            // NOME
+      saleData.email || '',                           // E-MAIL
+      saleData.phone || '',                           // TELEFONE
+      mapOfferName(saleData.plan, saleData.offerName), // NOME DA OFERTA
+      saleData.utmSource || '',                       // UTM_SOURCE
+      saleData.utmCampaign || '',                     // UTM_CAMPAIGN
+      saleData.utmMedium || '',                       // UTM_MEDIUM
+      saleData.utmContent || '',                      // UTM_CONTENT
+      saleData.utmTerm || '',                         // UTM_TERM
+      saleData.coupon || '',                          // CUPOM
+    ];
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `'${SALES_SHEET_NAME}'!A:R`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [row],
+      },
+    });
+
+    console.log(`✅ Venda salva na aba "Lista Vendas": ${saleData.transactionId || 'N/A'}`);
+    
+    return {
+      success: true,
+      message: 'Venda salva na aba "Lista Vendas"',
+    };
+  } catch (error: any) {
+    console.error('❌ Erro ao salvar venda na aba "Lista Vendas":', error.message);
+    return {
+      success: false,
+      message: `Erro ao salvar venda: ${error.message}`,
+    };
+  }
+}
