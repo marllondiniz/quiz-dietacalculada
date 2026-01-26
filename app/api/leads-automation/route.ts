@@ -8,6 +8,12 @@ import {
   AUTOMATION_HEADERS,
   CheckoutSource 
 } from '@/lib/leadsAutomation';
+import { 
+  leadCaptureSchema, 
+  saleApprovedSchema, 
+  hublaWebhookSchema 
+} from '@/lib/validations';
+import { ZodError } from 'zod';
 
 // Força execução dinâmica
 export const dynamic = 'force-dynamic';
@@ -39,6 +45,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     console.log('📥 Payload recebido:', JSON.stringify(body, null, 2));
+
+    // Validar payload com Zod
+    try {
+      // Se tem estrutura de Hubla, validar
+      if (body.type && body.event) {
+        hublaWebhookSchema.parse(body);
+      }
+    } catch (validationError) {
+      if (validationError instanceof ZodError) {
+        console.error('❌ Erro de validação Zod:', validationError.issues);
+        return NextResponse.json({
+          success: false,
+          error: 'Dados inválidos',
+          details: validationError.issues,
+        }, { status: 400 });
+      }
+    }
 
     // Detectar origem pelos HEADERS da Hubla ou pelo body
     const isHubla = isRequestFromHubla(request);
@@ -289,46 +312,50 @@ async function handleLeadCapture(
 ): Promise<NextResponse> {
   const { lead_id, FirstName, email, phone } = data;
 
-  // Validações
-  if (!email && !phone) {
+  // Validar dados com Zod
+  try {
+    const validatedData = leadCaptureSchema.parse({
+      lead_id,
+      FirstName,
+      email,
+      phone,
+      checkout_source: source,
+    });
+
+    // Usar dados validados
+    const result = await upsertLead({
+      lead_id: validatedData.lead_id,
+      FirstName: validatedData.FirstName.trim(),
+      email: validatedData.email || '',
+      phone: validatedData.phone || '',
+      checkout_source: source,
+    });
+
+    console.log(`✅ Lead capturado (${source}):`, result);
+
     return NextResponse.json({
-      success: false,
-      error: 'Dados insuficientes',
-      message: 'É necessário fornecer email ou phone',
+      success: true,
+      message: result.isNew ? 'Lead criado' : 'Lead atualizado',
+      lead_id: result.lead_id,
+      isNew: result.isNew,
       source,
       event: 'lead_capture',
-    }, { status: 400 });
+    });
+    
+  } catch (validationError) {
+    if (validationError instanceof ZodError) {
+      console.error('❌ Erro de validação:', validationError.issues);
+      return NextResponse.json({
+        success: false,
+        error: 'Dados inválidos',
+        message: validationError.issues[0].message,
+        details: validationError.issues,
+        source,
+        event: 'lead_capture',
+      }, { status: 400 });
+    }
+    throw validationError;
   }
-
-  if (!FirstName) {
-    return NextResponse.json({
-      success: false,
-      error: 'Dados insuficientes',
-      message: 'FirstName é obrigatório',
-      source,
-      event: 'lead_capture',
-    }, { status: 400 });
-  }
-
-  // Criar/atualizar lead (com checkout_source)
-  const result = await upsertLead({
-    lead_id,
-    FirstName: FirstName.trim(),
-    email: email || '',
-    phone: phone || '',
-    checkout_source: source,
-  });
-
-  console.log(`✅ Lead capturado (${source}):`, result);
-
-  return NextResponse.json({
-    success: true,
-    message: result.isNew ? 'Lead criado' : 'Lead atualizado',
-    lead_id: result.lead_id,
-    isNew: result.isNew,
-    source,
-    event: 'lead_capture',
-  });
 }
 
 async function handleSaleApproved(
@@ -337,37 +364,60 @@ async function handleSaleApproved(
 ): Promise<NextResponse> {
   const { email, phone } = data;
 
-  if (!email && !phone) {
-    return NextResponse.json({
-      success: false,
-      error: 'Dados insuficientes',
-      message: 'É necessário fornecer email ou phone para identificar o lead',
-      source,
-      event: 'sale_approved',
-    }, { status: 400 });
-  }
-
-  const checkoutSource: CheckoutSource = source;
-  const result = await markLeadAsPurchased(email, phone, checkoutSource);
-
-  if (!result.success) {
-    console.warn(`⚠️ Lead não encontrado para venda (${source}):`, { email, phone });
-    return NextResponse.json({
-      success: false,
-      message: result.message,
-      source,
-      event: 'sale_approved',
-      note: 'Lead não encontrado na aba de automação',
+  // Validar dados com Zod
+  try {
+    const validatedData = saleApprovedSchema.parse({
+      email,
+      phone,
+      checkout_source: source,
     });
+
+    const checkoutSource: CheckoutSource = source;
+    const result = await markLeadAsPurchased(
+      validatedData.email, 
+      validatedData.phone, 
+      checkoutSource
+    );
+
+    if (!result.success) {
+      console.warn(`⚠️ Lead não encontrado para venda (${source}):`, { 
+        email: validatedData.email, 
+        phone: validatedData.phone 
+      });
+      return NextResponse.json({
+        success: false,
+        message: result.message,
+        source,
+        event: 'sale_approved',
+        note: 'Lead não encontrado na aba de automação',
+      });
+    }
+
+    console.log(`✅ Venda registrada (${source}):`, { 
+      email: validatedData.email, 
+      phone: validatedData.phone 
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Venda registrada',
+      checkout_source: checkoutSource,
+      source,
+      event: 'sale_approved',
+    });
+    
+  } catch (validationError) {
+    if (validationError instanceof ZodError) {
+      console.error('❌ Erro de validação:', validationError.issues);
+      return NextResponse.json({
+        success: false,
+        error: 'Dados inválidos',
+        message: validationError.issues[0].message,
+        details: validationError.issues,
+        source,
+        event: 'sale_approved',
+      }, { status: 400 });
+    }
+    throw validationError;
   }
-
-  console.log(`✅ Venda registrada (${source}):`, { email, phone });
-
-  return NextResponse.json({
-    success: true,
-    message: 'Venda registrada',
-    checkout_source: checkoutSource,
-    source,
-    event: 'sale_approved',
-  });
 }

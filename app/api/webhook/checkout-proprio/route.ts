@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { saleApprovedSchema } from '@/lib/validations';
+import { ZodError } from 'zod';
 
 /**
  * WEBHOOK DO CHECKOUT PRÓPRIO
@@ -26,49 +28,57 @@ export async function POST(request: NextRequest) {
     
     console.log('📥 Webhook checkout próprio recebido:', body);
 
-    // Validar campos obrigatórios
-    const { email, phone } = body;
-    
-    if (!email && !phone) {
+    // Validar com Zod
+    try {
+      const validatedData = saleApprovedSchema.parse(body);
+      
+      // Usar dados validados
+      const automationUrl = new URL('/api/leads-automation', request.url);
+      
+      const response = await fetch(automationUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'sale',
+          email: validatedData.email || '',
+          phone: validatedData.phone || '',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ Erro ao registrar venda:', result);
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao registrar venda',
+          details: result,
+        }, { status: 500 });
+      }
+
+      console.log('✅ Venda registrada com sucesso:', result);
+
       return NextResponse.json({
-        success: false,
-        error: 'Email ou telefone é obrigatório',
-      }, { status: 400 });
+        success: true,
+        message: 'Venda registrada com sucesso',
+        data: result,
+      });
+      
+    } catch (validationError) {
+      if (validationError instanceof ZodError) {
+        console.error('❌ Erro de validação:', validationError.issues);
+        return NextResponse.json({
+          success: false,
+          error: 'Dados inválidos',
+          message: validationError.issues[0].message,
+          details: validationError.issues,
+        }, { status: 400 });
+      }
+      throw validationError;
     }
 
-    // Chamar o endpoint de automação para marcar como venda
-    const automationUrl = new URL('/api/leads-automation', request.url);
-    
-    const response = await fetch(automationUrl.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'sale',
-        email: email || '',
-        phone: phone || '',
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ Erro ao registrar venda:', result);
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao registrar venda',
-        details: result,
-      }, { status: 500 });
-    }
-
-    console.log('✅ Venda registrada com sucesso:', result);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Venda registrada com sucesso',
-      data: result,
-    });
 
   } catch (error: any) {
     console.error('❌ Erro no webhook checkout próprio:', error);
