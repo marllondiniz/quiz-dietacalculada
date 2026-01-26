@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-// URLs de checkout - Split 50/50 entre Hubla e Cakto
+// URLs de checkout - 100% Hubla
+// (Cakto desabilitado temporariamente)
 const CHECKOUT_URLS = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
@@ -352,9 +353,14 @@ export default function VendasPage() {
   };
 
   const handleCheckout = (plan: 'annual' | 'monthly') => {
-    // Split 50/50 entre Hubla e Cakto usando random
+    // ✅ 100% HUBLA - Sempre direciona para Hubla
+    const checkoutUrl = CHECKOUT_URLS.hubla[plan];
+    
+    /* CÓDIGO ANTERIOR (Split 50/50) - COMENTADO
     const useHubla = Math.random() < 0.5;
     const checkoutUrl = useHubla ? CHECKOUT_URLS.hubla[plan] : CHECKOUT_URLS.cakto[plan];
+    */
+    
     window.location.href = checkoutUrl;
   };
 

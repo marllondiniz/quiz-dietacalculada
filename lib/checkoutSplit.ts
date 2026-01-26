@@ -1,8 +1,8 @@
 /**
- * Checkout Split System - 50/50 A/B Testing
+ * Checkout System - 100% Hubla
  * 
- * 50% -> Hubla
- * 50% -> Cakto
+ * 100% -> Hubla
+ * (Cakto desabilitado temporariamente)
  * 
  * Persistência por 30 dias via localStorage/cookie
  */
@@ -10,7 +10,7 @@
 export type CheckoutVariant = 'hubla' | 'cakto';
 export type PlanType = 'annual' | 'monthly';
 
-export const SPLIT_VERSION = '50_50_hubla_cakto_v1';
+export const SPLIT_VERSION = '100_hubla_v1';
 const STORAGE_KEY = 'dc_checkout_variant';
 const EXPIRY_DAYS = 30;
 
@@ -102,11 +102,20 @@ function saveVariant(variant: CheckoutVariant): void {
  * Determina a variante de checkout para o usuário
  * 
  * Regras:
- * 1. Se já existe variante válida no storage, usa ela
- * 2. Se tem email, usa hash do email para determinar (consistência)
- * 3. Senão, sorteia 50/50 e salva
+ * 1. SEMPRE retorna 'hubla' (100% Hubla)
+ * 
+ * Código anterior (split 50/50) comentado abaixo:
+ * - Se já existe variante válida no storage, usa ela
+ * - Se tem email, usa hash do email para determinar (consistência)
+ * - Senão, sorteia 50/50 e salva
  */
 export function getCheckoutVariant(email?: string): CheckoutVariant {
+  // ✅ 100% HUBLA - Forçando sempre Hubla
+  const variant: CheckoutVariant = 'hubla';
+  saveVariant(variant);
+  return variant;
+  
+  /* CÓDIGO ANTERIOR (Split 50/50) - COMENTADO
   const storedVariant = getStoredVariant();
   if (storedVariant) {
     return storedVariant.variant;
@@ -126,6 +135,7 @@ export function getCheckoutVariant(email?: string): CheckoutVariant {
   saveVariant(variant);
   
   return variant;
+  */
 }
 
 /**
