@@ -3,10 +3,16 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-// URLs de checkout Hubla
+// URLs de checkout - Split 50/50 entre Hubla e Cakto
 const CHECKOUT_URLS = {
-  annual: 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD',
-  monthly: 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy',
+  hubla: {
+    annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
+    monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
+  },
+  cakto: {
+    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
+    monthly: 'https://pay.cakto.com.br/bigpf3i',
+  },
 };
 
 // Links WhatsApp
@@ -346,7 +352,10 @@ export default function VendasPage() {
   };
 
   const handleCheckout = (plan: 'annual' | 'monthly') => {
-    window.location.href = CHECKOUT_URLS[plan];
+    // Split 50/50 entre Hubla e Cakto usando random
+    const useHubla = Math.random() < 0.5;
+    const checkoutUrl = useHubla ? CHECKOUT_URLS.hubla[plan] : CHECKOUT_URLS.cakto[plan];
+    window.location.href = checkoutUrl;
   };
 
   return (
@@ -632,14 +641,14 @@ export default function VendasPage() {
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2">
                     <span className="text-[16px] text-gray-400">12x de</span>
-                    <span className="text-[42px] md:text-[52px] font-extrabold text-[#FF911A]">R$ 10,24</span>
+                    <span className="text-[42px] md:text-[52px] font-extrabold text-[#FF911A]">R$ 11,37</span>
                   </div>
-                  <p className="text-[14px] text-gray-500">ou R$ 99,90 à vista</p>
+                  <p className="text-[14px] text-gray-500">ou R$ 109,90 à vista</p>
                 </div>
 
                 {/* Badge Economia */}
                 <div className="inline-block bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-[13px] font-bold mb-6">
-                  💰 Economize R$ 234,90 no ano!
+                  💰 Economize R$ 260,90 no ano!
                 </div>
 
                 <ul className="space-y-3">
@@ -686,7 +695,7 @@ export default function VendasPage() {
                 
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[42px] md:text-[52px] font-extrabold text-white">R$ 27,90</span>
+                    <span className="text-[42px] md:text-[52px] font-extrabold text-white">R$ 30,90</span>
                     <span className="text-[16px] text-gray-400">/mês</span>
                   </div>
                   <p className="text-[14px] text-gray-500">Pagamento mensal recorrente</p>
