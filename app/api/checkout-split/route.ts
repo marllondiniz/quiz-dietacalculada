@@ -3,22 +3,26 @@ import { google } from 'googleapis';
 import { upsertLead } from '@/lib/leadsAutomation';
 
 /**
- * API de Checkout - Apenas Hubla
+ * API de Checkout - Split 50/50 entre Hubla e Cakto
  * 
- * Todos os usuários são redirecionados para o checkout Hubla.
+ * Os usuários são distribuídos aleatoriamente entre Hubla e Cakto.
  */
 
-export type CheckoutVariant = 'hubla';
+export type CheckoutVariant = 'hubla' | 'cakto';
 export type PlanType = 'annual' | 'monthly';
 
-const CHECKOUT_VERSION = 'hubla_only_v1';
+const CHECKOUT_VERSION = 'hubla_cakto_split_v1';
 const DATA_SHEET_NAME = 'Página1';
 
-// URLs de checkout Hubla
+// URLs de checkout - Split 50/50 entre Hubla e Cakto
 const CHECKOUT_URLS = {
   hubla: {
-    annual: 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD',
-    monthly: 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy',
+    annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
+    monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
+  },
+  cakto: {
+    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
+    monthly: 'https://pay.cakto.com.br/bigpf3i',
   },
 };
 
@@ -50,8 +54,8 @@ async function getGoogleSheetsClient() {
 }
 
 
-function buildCheckoutUrl(plan: PlanType, utmParams: Record<string, string>): string {
-  const baseUrl = CHECKOUT_URLS.hubla[plan];
+function buildCheckoutUrl(variant: CheckoutVariant, plan: PlanType, utmParams: Record<string, string>): string {
+  const baseUrl = CHECKOUT_URLS[variant][plan];
   
   const params = new URLSearchParams();
   Object.entries(utmParams).forEach(([key, value]) => {
@@ -94,11 +98,11 @@ export async function POST(request: NextRequest) {
 
     sheets = await getGoogleSheetsClient();
     
-    // Sempre usar Hubla
-    const variant: CheckoutVariant = 'hubla';
-    const checkoutUrl = buildCheckoutUrl(plan, utmParams);
+    // Split 50/50 entre Hubla e Cakto
+    const variant: CheckoutVariant = Math.random() < 0.5 ? 'hubla' : 'cakto';
+    const checkoutUrl = buildCheckoutUrl(variant, plan, utmParams);
     
-    console.log(`🎯 Checkout Hubla - Plano: ${plan}`);
+    console.log(`🎯 Checkout ${variant.toUpperCase()} - Plano: ${plan}`);
     
     // Preparar dados para salvar na planilha principal
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -248,9 +252,9 @@ export async function POST(request: NextRequest) {
           FirstName: quizData.name,
           email: quizData.email || '',
           phone: quizData.phone || '',
-          checkout_source: 'hubla',
+          checkout_source: variant,
         });
-        console.log('✅ Sincronizado com Leads_Automacao:', syncResult);
+        console.log(`✅ Sincronizado com Leads_Automacao (${variant}):`, syncResult);
       } catch (syncError) {
         console.error('⚠️ Erro ao sincronizar com Leads_Automacao (não bloqueante):', syncError);
       }

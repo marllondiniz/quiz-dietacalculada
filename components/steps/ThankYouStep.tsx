@@ -98,8 +98,8 @@ export default function ThankYouStep() {
         
         // Fallback: redirecionar para Hubla em caso de erro
         const fallbackUrl = plan === 'annual' 
-          ? 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD'
-          : 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy';
+          ? 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3'
+          : 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0';
         
         console.log('🔄 Usando fallback Hubla:', fallbackUrl);
         window.location.href = fallbackUrl;
@@ -170,21 +170,21 @@ export default function ThankYouStep() {
                   <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Anual</h3>
                   
                   <div className="mb-2 md:mb-3">
-                    {/* Valor destacado - 12x R$ 10,24 */}
+                    {/* Valor destacado - 12x R$ 11,37 */}
                     <div className="bg-gradient-to-br from-[#FF911A]/10 to-[#FF6B00]/10 rounded-xl p-3 md:p-4 mb-2 border-2 border-[#FF911A]/30">
                       <div className="flex items-baseline justify-center gap-1.5">
                         <span className="text-[18px] md:text-[22px] font-bold text-gray-700">12x de</span>
-                        <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 10,24</span>
+                        <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 11,37</span>
                       </div>
                       <p className="text-[11px] md:text-[12px] text-gray-600 text-center mt-1">
-                        ou R$ 99,90 à vista
+                        ou R$ 109,90 à vista
                       </p>
                     </div>
                     
                     {/* Badge de economia destacado */}
                     <div className="flex justify-center mt-2">
                       <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-1.5 rounded-full text-[12px] md:text-[13px] font-bold shadow-lg transform hover:scale-105 transition-transform">
-                        💰 Economize R$ 234,90 no ano!
+                        💰 Economize R$ 260,90 no ano!
                       </div>
                     </div>
                   </div>
@@ -247,7 +247,7 @@ export default function ThankYouStep() {
                   
                   <div className="mb-2 md:mb-3">
                     <p className="text-[26px] md:text-[32px] font-bold text-black leading-none">
-                      R$ 27,90<span className="text-[14px] md:text-[16px] text-gray-600 font-normal">/mês</span>
+                      R$ 30,90<span className="text-[14px] md:text-[16px] text-gray-600 font-normal">/mês</span>
                     </p>
                     <p className="text-[12px] md:text-[13px] text-gray-600 mt-1">
                       Pagamento mensal recorrente

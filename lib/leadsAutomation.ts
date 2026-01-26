@@ -38,12 +38,12 @@ export interface AutomationLead {
   created_at: string;
   purchased: boolean;
   zaia_sent: boolean;
-  checkout_source: 'hubla' | 'proprio' | '';
+  checkout_source: 'hubla' | 'cakto' | '';
   purchase_at: string;
 }
 
 // Tipo para checkout source
-export type CheckoutSource = 'hubla' | 'proprio';
+export type CheckoutSource = 'hubla' | 'cakto';
 
 /**
  * Cria instância autenticada do Google Sheets
@@ -182,7 +182,7 @@ export async function getAllLeads(): Promise<AutomationLead[]> {
     created_at: row[COLUMN_INDEXES.created_at] || '',
     purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
     zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-    checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'proprio',
+    checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
     purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
   }));
 }
@@ -223,7 +223,7 @@ export async function findLeadByEmailOrPhone(
           created_at: row[COLUMN_INDEXES.created_at] || '',
           purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'proprio',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
         },
         rowIndex: i + 1, // +1 porque a planilha é 1-indexed
@@ -241,7 +241,7 @@ export async function findLeadByEmailOrPhone(
           created_at: row[COLUMN_INDEXES.created_at] || '',
           purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'proprio',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
         },
         rowIndex: i + 1,
@@ -393,7 +393,7 @@ export async function upsertLead(data: {
 export async function markLeadAsPurchased(
   email?: string,
   phone?: string,
-  checkoutSource: CheckoutSource = 'proprio'
+  checkoutSource: CheckoutSource = 'hubla'
 ): Promise<{ success: boolean; message: string }> {
   const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
 

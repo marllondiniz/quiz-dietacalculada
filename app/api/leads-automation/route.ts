@@ -40,11 +40,19 @@ export async function POST(request: NextRequest) {
 
     console.log('📥 Payload recebido:', JSON.stringify(body, null, 2));
 
-    // Detectar origem pelos HEADERS da Hubla
+    // Detectar origem pelos HEADERS da Hubla ou pelo body
     const isHubla = isRequestFromHubla(request);
-    const source: 'hubla' | 'proprio' = isHubla ? 'hubla' : 'proprio';
+    const isCakto = isRequestFromCakto(request, body);
+    
+    let source: 'hubla' | 'cakto' = isHubla ? 'hubla' : 'cakto';
+    
+    // Se veio explicitamente no body, usar isso
+    if (body.checkout_source && ['hubla', 'cakto'].includes(body.checkout_source)) {
+      source = body.checkout_source;
+    }
 
     console.log(`🔍 Headers Hubla: ${isHubla ? 'SIM' : 'NÃO'}`);
+    console.log(`🔍 Headers/Body Cakto: ${isCakto ? 'SIM' : 'NÃO'}`);
     console.log(`🔍 Origem: ${source}`);
 
     // Garantir que a aba existe
@@ -97,7 +105,7 @@ export async function GET() {
       pendingZaia: leads.filter((l) => !l.purchased && !l.zaia_sent).length,
       bySource: {
         hubla: leads.filter((l) => l.checkout_source === 'hubla').length,
-        proprio: leads.filter((l) => l.checkout_source === 'proprio').length,
+        cakto: leads.filter((l) => l.checkout_source === 'cakto').length,
       },
     };
 
@@ -114,9 +122,9 @@ export async function GET() {
             lead_capture: ['lead.created', 'lead.abandoned_checkout'],
             sale_approved: ['invoice.payment.approved', 'sale.created', 'purchase.approved'],
           },
-          proprio: {
-            lead_capture: '{ action: "capture", FirstName, email, phone }',
-            sale_approved: '{ action: "sale", email, phone }',
+          cakto: {
+            lead_capture: '{ action: "capture", FirstName, email, phone, checkout_source: "cakto" }',
+            sale_approved: '{ action: "sale", email, phone, checkout_source: "cakto" }',
           },
         },
       },
@@ -150,6 +158,21 @@ function isRequestFromHubla(request: NextRequest): boolean {
   return !!(hublaToken || hublaIdempotency);
 }
 
+/**
+ * Verifica se a requisição vem do Cakto
+ */
+function isRequestFromCakto(request: NextRequest, body: any): boolean {
+  // Headers específicos do Cakto (se houver)
+  const caktoToken = request.headers.get('x-cakto-token');
+  
+  // Ou verificar no body se tem identificador do Cakto
+  const hasCaktoIndicator = body.checkout_source === 'cakto' || 
+                           body.source === 'cakto' ||
+                           (body.checkout_url && body.checkout_url.includes('cakto.com.br'));
+  
+  return !!(caktoToken || hasCaktoIndicator);
+}
+
 // ==========================================
 // DETECÇÃO DE TIPO DE EVENTO (pelo body)
 // ==========================================
@@ -166,11 +189,11 @@ interface DetectedEventData {
   };
 }
 
-function detectEventType(body: any, source: 'hubla' | 'proprio'): DetectedEventData {
+function detectEventType(body: any, source: 'hubla' | 'cakto'): DetectedEventData {
   if (source === 'hubla') {
     return detectHublaEventType(body);
   }
-  return detectProprioEventType(body);
+  return detectCaktoEventType(body);
 }
 
 function detectHublaEventType(body: any): DetectedEventData {
@@ -204,7 +227,7 @@ function detectHublaEventType(body: any): DetectedEventData {
   return { eventType, data };
 }
 
-function detectProprioEventType(body: any): DetectedEventData {
+function detectCaktoEventType(body: any): DetectedEventData {
   const action = (body.action || '').toLowerCase();
 
   // Venda aprovada
@@ -262,7 +285,7 @@ function normalizePhone(phone: any): string | undefined {
 
 async function handleLeadCapture(
   data: DetectedEventData['data'],
-  source: 'hubla' | 'proprio'
+  source: 'hubla' | 'cakto'
 ): Promise<NextResponse> {
   const { lead_id, FirstName, email, phone } = data;
 
@@ -293,7 +316,7 @@ async function handleLeadCapture(
     FirstName: FirstName.trim(),
     email: email || '',
     phone: phone || '',
-    checkout_source: source === 'hubla' ? 'hubla' : 'proprio',
+    checkout_source: source,
   });
 
   console.log(`✅ Lead capturado (${source}):`, result);
@@ -310,7 +333,7 @@ async function handleLeadCapture(
 
 async function handleSaleApproved(
   data: DetectedEventData['data'],
-  source: 'hubla' | 'proprio'
+  source: 'hubla' | 'cakto'
 ): Promise<NextResponse> {
   const { email, phone } = data;
 
@@ -324,7 +347,7 @@ async function handleSaleApproved(
     }, { status: 400 });
   }
 
-  const checkoutSource: CheckoutSource = source === 'hubla' ? 'hubla' : 'proprio';
+  const checkoutSource: CheckoutSource = source;
   const result = await markLeadAsPurchased(email, phone, checkoutSource);
 
   if (!result.success) {
