@@ -1,16 +1,16 @@
 /**
- * Checkout Split System - 80/20 A/B Testing
+ * Checkout Split System - 50/50 A/B Testing
  * 
- * 80% -> Hubla
- * 20% -> Checkout próprio
+ * 50% -> Hubla
+ * 50% -> Cakto
  * 
  * Persistência por 30 dias via localStorage/cookie
  */
 
-export type CheckoutVariant = 'hubla' | 'proprio';
+export type CheckoutVariant = 'hubla' | 'cakto';
 export type PlanType = 'annual' | 'monthly';
 
-export const SPLIT_VERSION = '80_20_v1';
+export const SPLIT_VERSION = '50_50_hubla_cakto_v1';
 const STORAGE_KEY = 'dc_checkout_variant';
 const EXPIRY_DAYS = 30;
 
@@ -23,12 +23,12 @@ interface StoredVariant {
 // URLs de checkout
 const CHECKOUT_URLS = {
   hubla: {
-    annual: 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD',
-    monthly: 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy',
+    annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
+    monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
   },
-  proprio: {
-    annual: 'https://checkout.dietacalculada.com?plan=annual',
-    monthly: 'https://checkout.dietacalculada.com?plan=monthly',
+  cakto: {
+    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
+    monthly: 'https://pay.cakto.com.br/bigpf3i',
   },
 };
 
@@ -93,7 +93,6 @@ function saveVariant(variant: CheckoutVariant): void {
       splitVersion: SPLIT_VERSION,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    console.log(`💾 Variante "${variant}" salva no localStorage`);
   } catch (error) {
     console.error('Erro ao salvar variante no localStorage:', error);
   }
@@ -105,34 +104,25 @@ function saveVariant(variant: CheckoutVariant): void {
  * Regras:
  * 1. Se já existe variante válida no storage, usa ela
  * 2. Se tem email, usa hash do email para determinar (consistência)
- * 3. Senão, sorteia 80/20 e salva
+ * 3. Senão, sorteia 50/50 e salva
  */
 export function getCheckoutVariant(email?: string): CheckoutVariant {
-  // 1. Verificar se já existe variante armazenada
   const storedVariant = getStoredVariant();
   if (storedVariant) {
-    console.log(`🔄 Usando variante existente: ${storedVariant.variant}`);
     return storedVariant.variant;
   }
   
-  // 2. Se tem email, usar hash para consistência
   let variant: CheckoutVariant;
   
   if (email) {
     const hash = hashEmail(email);
-    // Usar os últimos 2 caracteres do hash para determinar (0-255)
     const hashNum = parseInt(hash.slice(-2), 16) || 0;
-    // 0-204 = hubla (80%), 205-255 = proprio (20%)
-    variant = hashNum < 205 ? 'hubla' : 'proprio';
-    console.log(`📧 Variante baseada em email hash (${hash}): ${variant}`);
+    variant = hashNum < 128 ? 'hubla' : 'cakto';
   } else {
-    // 3. Sortear 80/20
     const random = Math.random();
-    variant = random < 0.8 ? 'hubla' : 'proprio';
-    console.log(`🎲 Variante sorteada (random=${random.toFixed(3)}): ${variant}`);
+    variant = random < 0.5 ? 'hubla' : 'cakto';
   }
   
-  // Salvar para futuras visitas
   saveVariant(variant);
   
   return variant;

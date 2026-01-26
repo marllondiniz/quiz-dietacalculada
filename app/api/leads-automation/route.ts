@@ -44,17 +44,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    console.log('📥 Payload recebido:', JSON.stringify(body, null, 2));
-
     // Validar payload com Zod
     try {
-      // Se tem estrutura de Hubla, validar
       if (body.type && body.event) {
         hublaWebhookSchema.parse(body);
       }
     } catch (validationError) {
       if (validationError instanceof ZodError) {
-        console.error('❌ Erro de validação Zod:', validationError.issues);
         return NextResponse.json({
           success: false,
           error: 'Dados inválidos',
@@ -74,17 +70,9 @@ export async function POST(request: NextRequest) {
       source = body.checkout_source;
     }
 
-    console.log(`🔍 Headers Hubla: ${isHubla ? 'SIM' : 'NÃO'}`);
-    console.log(`🔍 Headers/Body Cakto: ${isCakto ? 'SIM' : 'NÃO'}`);
-    console.log(`🔍 Origem: ${source}`);
-
-    // Garantir que a aba existe
     await ensureAutomationSheetExists();
 
-    // Detectar tipo de evento pelo body
     const { eventType, data } = detectEventType(body, source);
-
-    console.log(`📋 Tipo de evento: ${eventType}`);
 
     // Executar ação baseada no tipo de evento
     switch (eventType) {
@@ -173,11 +161,6 @@ function isRequestFromHubla(request: NextRequest): boolean {
   const hublaToken = request.headers.get('x-hubla-token');
   const hublaIdempotency = request.headers.get('x-hubla-idempotency');
   
-  console.log('🔍 Headers:', {
-    'x-hubla-token': hublaToken ? 'presente' : 'ausente',
-    'x-hubla-idempotency': hublaIdempotency ? 'presente' : 'ausente',
-  });
-
   return !!(hublaToken || hublaIdempotency);
 }
 
@@ -244,8 +227,6 @@ function detectHublaEventType(body: any): DetectedEventData {
   } else if (isSaleApproved) {
     eventType = 'sale_approved';
   }
-
-  console.log(`📋 Hubla type "${body.type}" → ${eventType}`);
 
   return { eventType, data };
 }
@@ -322,7 +303,6 @@ async function handleLeadCapture(
       checkout_source: source,
     });
 
-    // Usar dados validados
     const result = await upsertLead({
       lead_id: validatedData.lead_id,
       FirstName: validatedData.FirstName.trim(),
@@ -330,8 +310,6 @@ async function handleLeadCapture(
       phone: validatedData.phone || '',
       checkout_source: source,
     });
-
-    console.log(`✅ Lead capturado (${source}):`, result);
 
     return NextResponse.json({
       success: true,
@@ -344,7 +322,6 @@ async function handleLeadCapture(
     
   } catch (validationError) {
     if (validationError instanceof ZodError) {
-      console.error('❌ Erro de validação:', validationError.issues);
       return NextResponse.json({
         success: false,
         error: 'Dados inválidos',
@@ -380,10 +357,6 @@ async function handleSaleApproved(
     );
 
     if (!result.success) {
-      console.warn(`⚠️ Lead não encontrado para venda (${source}):`, { 
-        email: validatedData.email, 
-        phone: validatedData.phone 
-      });
       return NextResponse.json({
         success: false,
         message: result.message,
@@ -392,11 +365,6 @@ async function handleSaleApproved(
         note: 'Lead não encontrado na aba de automação',
       });
     }
-
-    console.log(`✅ Venda registrada (${source}):`, { 
-      email: validatedData.email, 
-      phone: validatedData.phone 
-    });
 
     return NextResponse.json({
       success: true,
@@ -408,7 +376,6 @@ async function handleSaleApproved(
     
   } catch (validationError) {
     if (validationError instanceof ZodError) {
-      console.error('❌ Erro de validação:', validationError.issues);
       return NextResponse.json({
         success: false,
         error: 'Dados inválidos',
