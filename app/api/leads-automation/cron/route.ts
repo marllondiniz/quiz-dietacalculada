@@ -38,18 +38,11 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    console.log('🔄 Processando leads abandonados...');
-
-    // Permite override do limiar por query param (útil para teste local)
-    // Ex: /api/leads-automation/cron?minutes=0
     const minutesParam = request.nextUrl.searchParams.get('minutes');
     const minutes =
       minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 5;
 
-    // Buscar leads elegíveis (minutes+ minutos)
     const abandonedLeads = await getAbandonedLeads(minutes);
-
-    console.log(`📊 ${abandonedLeads.length} leads abandonados encontrados`);
 
     if (abandonedLeads.length === 0) {
       return NextResponse.json({
@@ -67,14 +60,9 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
         const success = await sendToZaia(lead);
 
         if (success) {
-          // Marcar o lead atual
           await markLeadAsZaiaSent(rowIndex);
-          
-          // Marcar TODOS os outros leads com o mesmo telefone (evitar duplicatas)
           await markAllLeadsWithPhoneAsZaiaSent(lead.phone);
-          
           sent++;
-          console.log(`✅ Enviado: ${lead.FirstName} (${lead.phone})`);
         } else {
           failed++;
         }
@@ -83,11 +71,8 @@ async function processAbandoned(request: NextRequest): Promise<NextResponse> {
         failed++;
       }
 
-      // Delay entre envios
       await new Promise((r) => setTimeout(r, 100));
     }
-
-    console.log(`✅ Concluído: ${sent} enviados, ${failed} falhas`);
 
     return NextResponse.json({
       success: true,

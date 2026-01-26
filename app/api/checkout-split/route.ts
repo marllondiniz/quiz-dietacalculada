@@ -3,15 +3,16 @@ import { google } from 'googleapis';
 import { upsertLead } from '@/lib/leadsAutomation';
 
 /**
- * API de Checkout - Split 50/50 entre Hubla e Cakto
+ * API de Checkout - 100% Hubla
  * 
- * Os usuários são distribuídos aleatoriamente entre Hubla e Cakto.
+ * Todos os usuários são direcionados para Hubla.
+ * (Cakto desabilitado temporariamente)
  */
 
 export type CheckoutVariant = 'hubla' | 'cakto';
 export type PlanType = 'annual' | 'monthly';
 
-const CHECKOUT_VERSION = 'hubla_cakto_split_v1';
+const CHECKOUT_VERSION = '100_hubla_v1';
 const DATA_SHEET_NAME = 'Página1';
 
 // URLs de checkout - Split 50/50 entre Hubla e Cakto
@@ -98,11 +99,16 @@ export async function POST(request: NextRequest) {
 
     sheets = await getGoogleSheetsClient();
     
-    // Split 50/50 entre Hubla e Cakto
+    // ✅ 100% HUBLA - Todos usuários direcionados para Hubla
+    const variant: CheckoutVariant = 'hubla';
+    
+    /* CÓDIGO ANTERIOR (Split 50/50) - COMENTADO
     const variant: CheckoutVariant = Math.random() < 0.5 ? 'hubla' : 'cakto';
+    */
+    
     const checkoutUrl = buildCheckoutUrl(variant, plan, utmParams);
     
-    console.log(`🎯 Checkout ${variant.toUpperCase()} - Plano: ${plan}`);
+    console.log(`🎯 Checkout ${variant.toUpperCase()} (100% Hubla) - Plano: ${plan}`);
     
     // Preparar dados para salvar na planilha principal
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });

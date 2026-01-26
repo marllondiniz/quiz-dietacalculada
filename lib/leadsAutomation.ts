@@ -519,7 +519,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
   const rows = response.data.values || [];
   const now = new Date();
   const abandonedLeads: Array<{ lead: AutomationLead; rowIndex: number }> = [];
-  const processedPhones = new Set<string>(); // Rastrear telefones já processados
+  const processedPhones = new Set<string>();
 
   // Pular header
   for (let i = 1; i < rows.length; i++) {
@@ -558,7 +558,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
           created_at: createdAt,
           purchased: false,
           zaia_sent: false,
-          checkout_source: '',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
           purchase_at: '',
         };
 
