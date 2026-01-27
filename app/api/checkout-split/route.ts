@@ -3,16 +3,16 @@ import { google } from 'googleapis';
 import { upsertLead } from '@/lib/leadsAutomation';
 
 /**
- * API de Checkout - 100% Hubla
+ * API de Checkout - Split 50/50
  * 
- * Todos os usuários são direcionados para Hubla.
- * (Cakto desabilitado temporariamente)
+ * 50% dos usuários são direcionados para Hubla
+ * 50% dos usuários são direcionados para Cakto
  */
 
 export type CheckoutVariant = 'hubla' | 'cakto';
 export type PlanType = 'annual' | 'monthly';
 
-const CHECKOUT_VERSION = '100_hubla_v1';
+const CHECKOUT_VERSION = '50_50_split_v1';
 const DATA_SHEET_NAME = 'Página1';
 
 // URLs de checkout - Split 50/50 entre Hubla e Cakto
@@ -99,16 +99,29 @@ export async function POST(request: NextRequest) {
 
     sheets = await getGoogleSheetsClient();
     
-    // ✅ 100% HUBLA - Todos usuários direcionados para Hubla
-    const variant: CheckoutVariant = 'hubla';
+    // ✅ Split 50/50 - Distribuição entre Hubla e Cakto
+    // Usa hash do email se disponível para consistência, senão sorteia aleatoriamente
+    let variant: CheckoutVariant;
+    const email = quizData.email || '';
     
-    /* CÓDIGO ANTERIOR (Split 50/50) - COMENTADO
-    const variant: CheckoutVariant = Math.random() < 0.5 ? 'hubla' : 'cakto';
-    */
+    if (email) {
+      // Usa hash do email para garantir consistência (mesmo email sempre vai para mesmo checkout)
+      let hash = 0;
+      for (let i = 0; i < email.length; i++) {
+        const char = email.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      const hashNum = Math.abs(hash) % 256;
+      variant = hashNum < 128 ? 'hubla' : 'cakto';
+    } else {
+      // Se não tem email, sorteia 50/50
+      variant = Math.random() < 0.5 ? 'hubla' : 'cakto';
+    }
     
     const checkoutUrl = buildCheckoutUrl(variant, plan, utmParams);
     
-    console.log(`🎯 Checkout ${variant.toUpperCase()} (100% Hubla) - Plano: ${plan}`);
+    console.log(`🎯 Checkout ${variant.toUpperCase()} (Split 50/50) - Plano: ${plan}`);
     
     // Preparar dados para salvar na planilha principal
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
