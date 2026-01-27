@@ -27,6 +27,10 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# env example files - permitir apenas .env.example com placeholders
+# NUNCA commite credenciais reais no .env.example!
+env.example*
+
 # vercel
 .vercel
 
