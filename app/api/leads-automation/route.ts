@@ -9,7 +9,8 @@ import {
   CheckoutSource,
   saveSaleToSalesSheet,
   SaleData,
-  findLeadByEmailOrPhone
+  findLeadByEmailOrPhone,
+  findLeadUTMsInMainSheet,
 } from '@/lib/leadsAutomation';
 import { 
   leadCaptureSchema, 
@@ -73,9 +74,9 @@ export async function POST(request: NextRequest) {
       source = body.checkout_source;
     }
 
-    await ensureAutomationSheetExists();
-
     const { eventType, data } = detectEventType(body, source);
+
+    await ensureAutomationSheetExists();
 
     // Executar ação baseada no tipo de evento
     switch (eventType) {
@@ -276,64 +277,69 @@ function detectCaktoEventType(body: any): DetectedEventData {
 }
 
 function extractHublaData(body: any): DetectedEventData['data'] {
-  const event = body.event || {};
-  const lead = event.lead || {};
-  const customer = event.customer || event.buyer || event.user || {};
-  const invoice = event.invoice || {};
-  const payment = event.payment || invoice.payment || {};
-  const offer = event.offer || event.product || {};
-  const subscription = event.subscription || {};
-  const utm = event.utm || customer.utm || {};
-  
+  // Suporte a múltiplas estruturas: body.event (padrão), body.data, body.payload ou top-level
+  const event = body.event || body.data || body.payload || body;
+  const lead = event.lead || body.lead || {};
+  const customer = event.customer || event.buyer || event.user || body.customer || body.buyer || {};
+  const invoice = event.invoice || body.invoice || {};
+  const payment = event.payment || invoice.payment || body.payment || {};
+  const offer = event.offer || event.product || body.offer || body.product || {};
+  const subscription = event.subscription || body.subscription || {};
+  const utm = event.utm || customer.utm || body.utm || {};
+
   // Prioridade: lead > customer
   const source = lead.email ? lead : customer;
 
   // Extrair primeiro nome do fullName
-  const fullName = source.fullName || source.full_name || source.name || source.nome || '';
+  const fullName = source.fullName || source.full_name || source.name || source.nome || body.name || body.nome || '';
   const firstName = fullName.split(' ')[0] || fullName;
 
-  // Extrair valores
-  const grossValue = invoice.total || invoice.amount || payment.amount || event.amount || event.total;
-  const netValue = invoice.netAmount || invoice.net_amount || payment.netAmount || payment.net_amount;
+  // Extrair valores (vários caminhos possíveis no payload da Hubla)
+  const grossValueRaw = invoice.total ?? invoice.amount ?? payment.amount ?? payment.value ?? event.amount ?? event.total ?? body.amount ?? body.total;
+  const netValueRaw = invoice.netAmount ?? invoice.net_amount ?? payment.netAmount ?? payment.net_amount ?? body.netAmount ?? body.net_amount;
+  const grossValue = typeof grossValueRaw === 'number' ? grossValueRaw : (grossValueRaw != null ? parseFloat(String(grossValueRaw)) : undefined);
+  const netValue = typeof netValueRaw === 'number' ? netValueRaw : (netValueRaw != null ? parseFloat(String(netValueRaw)) : undefined);
 
   // Extrair forma de pagamento
-  let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || '';
+  let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || body.paymentMethod || '';
   if (paymentMethod) {
     paymentMethod = mapPaymentMethod(paymentMethod);
   }
 
-  // Extrair plano (anual/mensal)
-  let plan = offer.name || subscription.plan || event.plan || '';
-  if (!plan && grossValue) {
-    // Inferir plano pelo valor (R$ 99 = anual, R$ 27,90 ou R$ 30,90 = mensal)
-    if (grossValue >= 90) {
-      plan = 'annual';
-    } else {
-      plan = 'monthly';
+  // Extrair plano (anual/mensal): priorizar tipo de plano; se vier só nome da oferta (ex: "Dieta Calculada"), inferir pelo valor quando houver
+  let plan = (offer.name || subscription.plan || event.plan || body.plan || '').toString().trim();
+  const planLower = plan.toLowerCase();
+  const isPlanType = planLower.includes('annual') || planLower.includes('anual') || planLower.includes('monthly') || planLower.includes('mensal');
+  if (grossValue != null) {
+    if (!isPlanType || !plan) {
+      // Nome de produto (ex: "Dieta Calculada") ou plano vazio: inferir pelo valor
+      plan = grossValue >= 90 ? 'annual' : 'monthly';
     }
+  } else if (!plan) {
+    plan = '';
   }
 
   return {
-    lead_id: lead.id || source.id,
+    lead_id: lead.id || source.id || body.lead_id,
     FirstName: firstName,
-    email: (source.email || '').trim().toLowerCase() || undefined,
-    phone: normalizePhone(source.phone || source.telefone),
+    email: (source.email || body.email || '').toString().trim().toLowerCase() || undefined,
+    phone: normalizePhone(source.phone || source.telefone || body.phone || body.telefone),
     // Dados de venda
     transactionId: invoice.id || payment.id || event.id || body.id,
-    plan: plan,
-    grossValue: typeof grossValue === 'number' ? grossValue : parseFloat(grossValue) || undefined,
-    netValue: typeof netValue === 'number' ? netValue : parseFloat(netValue) || undefined,
+    plan: plan || undefined,
+    grossValue: grossValue ?? undefined,
+    netValue: netValue ?? undefined,
     paymentMethod: paymentMethod,
     offerName: offer.name || offer.title || subscription.name || '',
     purchaseDate: event.createdAt || event.created_at || invoice.createdAt || body.createdAt,
     paymentDate: payment.paidAt || payment.paid_at || invoice.paidAt || event.paidAt,
-    // UTMs
-    utmSource: utm.source || utm.utm_source || '',
-    utmCampaign: utm.campaign || utm.utm_campaign || '',
-    utmMedium: utm.medium || utm.utm_medium || '',
-    utmContent: utm.content || utm.utm_content || '',
-    utmTerm: utm.term || utm.utm_term || '',
-    coupon: invoice.coupon || payment.coupon || event.coupon || '',
+    // UTMs (vários caminhos: event, customer, top-level)
+    utmSource: (utm.source || utm.utm_source || body.utm_source || '').toString().trim(),
+    utmCampaign: (utm.campaign || utm.utm_campaign || body.utm_campaign || '').toString().trim(),
+    utmMedium: (utm.medium || utm.utm_medium || body.utm_medium || '').toString().trim(),
+    utmContent: (utm.content || utm.utm_content || body.utm_content || '').toString().trim(),
+    utmTerm: (utm.term || utm.utm_term || body.utm_term || '').toString().trim(),
+    coupon: invoice.coupon || payment.coupon || event.coupon || body.coupon || '',
   };
 }
 
@@ -447,6 +453,23 @@ async function handleSaleApproved(
         }
       } catch (err) {
         console.error('⚠️ Erro ao buscar lead para nome:', err);
+      }
+    }
+
+    // Se o webhook não enviou UTMs, buscar na planilha principal (Página1) onde o quiz salva UTMs no checkout
+    const hasNoUtms = !utmSource && !utmCampaign && !utmMedium && !utmContent && !utmTerm;
+    if (hasNoUtms && (validatedData.email || validatedData.phone)) {
+      try {
+        const utmsFromSheet = await findLeadUTMsInMainSheet(validatedData.email, validatedData.phone);
+        if (utmsFromSheet && (utmsFromSheet.utmSource || utmsFromSheet.utmCampaign || utmsFromSheet.utmMedium)) {
+          utmSource = utmsFromSheet.utmSource || utmSource;
+          utmCampaign = utmsFromSheet.utmCampaign || utmCampaign;
+          utmMedium = utmsFromSheet.utmMedium || utmMedium;
+          utmContent = utmsFromSheet.utmContent || utmContent;
+          utmTerm = utmsFromSheet.utmTerm || utmTerm;
+        }
+      } catch (err) {
+        console.error('⚠️ Erro ao buscar UTMs na planilha principal:', err);
       }
     }
 
