@@ -252,6 +252,56 @@ export async function findLeadByEmailOrPhone(
   return { lead: null, rowIndex: -1 };
 }
 
+/** Nome da aba principal do quiz (onde ficam UTMs do checkout) */
+const MAIN_SHEET_NAME = 'Página1';
+
+/** Índices na aba Página1: G=email(6), H=phone(7), AD=utm_source(29), AE=utm_medium(30), AF=utm_campaign(31), AG=utm_term(32), AH=utm_content(33) */
+const MAIN_SHEET_UTM_INDEXES = {
+  email: 6,
+  phone: 7,
+  utm_source: 29,
+  utm_medium: 30,
+  utm_campaign: 31,
+  utm_term: 32,
+  utm_content: 33,
+};
+
+/**
+ * Busca UTMs do lead na aba principal (Página1) por email ou telefone.
+ * Usado quando o webhook de venda não envia UTMs (ex: Hubla payment event).
+ */
+export async function findLeadUTMsInMainSheet(
+  email?: string,
+  phone?: string
+): Promise<{ utmSource: string; utmCampaign: string; utmMedium: string; utmContent: string; utmTerm: string } | null> {
+  if (!email && !phone) return null;
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  const normPhone = normalizePhone(phone);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${MAIN_SHEET_NAME}'!A:AH`,
+  });
+  const rows = response.data.values || [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowEmail = (row[MAIN_SHEET_UTM_INDEXES.email] || '').toString().trim().toLowerCase();
+    const rowPhone = (row[MAIN_SHEET_UTM_INDEXES.phone] || '').toString().trim();
+    const matchByEmail = email && rowEmail === email.trim().toLowerCase();
+    const matchByPhone = phone && normPhone && normalizePhone(rowPhone) === normPhone;
+    if (matchByEmail || matchByPhone) {
+      return {
+        utmSource: (row[MAIN_SHEET_UTM_INDEXES.utm_source] || '').toString().trim(),
+        utmCampaign: (row[MAIN_SHEET_UTM_INDEXES.utm_campaign] || '').toString().trim(),
+        utmMedium: (row[MAIN_SHEET_UTM_INDEXES.utm_medium] || '').toString().trim(),
+        utmContent: (row[MAIN_SHEET_UTM_INDEXES.utm_content] || '').toString().trim(),
+        utmTerm: (row[MAIN_SHEET_UTM_INDEXES.utm_term] || '').toString().trim(),
+      };
+    }
+  }
+  return null;
+}
+
 /**
  * Normaliza número de telefone removendo caracteres especiais
  */
