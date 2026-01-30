@@ -253,13 +253,34 @@ function detectHublaEventType(body: any): DetectedEventData {
 function detectCaktoEventType(body: any): DetectedEventData {
   const action = (body.action || '').toLowerCase();
 
-  // Venda aprovada
+  // Venda aprovada – extrair todos os campos possíveis para a Lista Vendas
   if (action === 'sale' || action === 'venda' || action === 'purchase') {
+    const amount = body.amount ?? body.total ?? body.valor;
+    const num = (v: unknown): number | undefined => {
+      if (v == null) return undefined;
+      const n = typeof v === 'number' ? v : parseFloat(String(v));
+      return Number.isFinite(n) ? n : undefined;
+    };
     return {
       eventType: 'sale_approved',
       data: {
+        FirstName: body.FirstName || body.firstName || body.name || body.nome,
         email: body.email?.trim().toLowerCase(),
         phone: normalizePhone(body.phone || body.telefone),
+        transactionId: body.transactionId || body.transaction_id || body.id,
+        plan: body.plan,
+        grossValue: num(amount ?? body.grossValue),
+        netValue: num(body.netAmount ?? body.net_amount ?? body.netValue),
+        paymentMethod: body.paymentMethod || body.payment_method,
+        offerName: body.offerName || body.offer_name,
+        purchaseDate: body.purchaseDate || body.createdAt,
+        paymentDate: body.paymentDate || body.paidAt,
+        utmSource: (body.utm_source || body.utmSource || '').toString().trim(),
+        utmCampaign: (body.utm_campaign || body.utmCampaign || '').toString().trim(),
+        utmMedium: (body.utm_medium || body.utmMedium || '').toString().trim(),
+        utmContent: (body.utm_content || body.utmContent || '').toString().trim(),
+        utmTerm: (body.utm_term || body.utmTerm || '').toString().trim(),
+        coupon: body.coupon || body.cupom || '',
       },
     };
   }
@@ -297,8 +318,13 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   // Extrair valores (vários caminhos possíveis no payload da Hubla)
   const grossValueRaw = invoice.total ?? invoice.amount ?? payment.amount ?? payment.value ?? event.amount ?? event.total ?? body.amount ?? body.total;
   const netValueRaw = invoice.netAmount ?? invoice.net_amount ?? payment.netAmount ?? payment.net_amount ?? body.netAmount ?? body.net_amount;
-  const grossValue = typeof grossValueRaw === 'number' ? grossValueRaw : (grossValueRaw != null ? parseFloat(String(grossValueRaw)) : undefined);
-  const netValue = typeof netValueRaw === 'number' ? netValueRaw : (netValueRaw != null ? parseFloat(String(netValueRaw)) : undefined);
+  const parseNum = (v: unknown): number | undefined => {
+    if (v == null) return undefined;
+    const n = typeof v === 'number' ? v : parseFloat(String(v));
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const grossValue = parseNum(grossValueRaw);
+  const netValue = parseNum(netValueRaw);
 
   // Extrair forma de pagamento
   let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || body.paymentMethod || '';
@@ -456,9 +482,9 @@ async function handleSaleApproved(
       }
     }
 
-    // Se o webhook não enviou UTMs, buscar na planilha principal (Página1) onde o quiz salva UTMs no checkout
-    const hasNoUtms = !utmSource && !utmCampaign && !utmMedium && !utmContent && !utmTerm;
-    if (hasNoUtms && (validatedData.email || validatedData.phone)) {
+    // Se algum UTM está faltando, buscar na planilha principal (Página1) para completar (não sobrescreve os já preenchidos)
+    const hasAnyMissingUtm = !utmSource || !utmCampaign || !utmMedium || !utmContent || !utmTerm;
+    if (hasAnyMissingUtm && (validatedData.email || validatedData.phone)) {
       try {
         const utmsFromSheet = await findLeadUTMsInMainSheet(validatedData.email, validatedData.phone);
         if (utmsFromSheet && (utmsFromSheet.utmSource || utmsFromSheet.utmCampaign || utmsFromSheet.utmMedium)) {

@@ -852,7 +852,8 @@ function mapOfferName(plan?: string, offerName?: string): string {
 }
 
 /**
- * Salva uma venda na aba "Lista Vendas"
+ * Salva uma venda na aba "Lista Vendas".
+ * Garante as 18 colunas (A–R) sempre preenchidas; valores ausentes viram string vazia ou data/hora atual.
  */
 export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ success: boolean; message: string }> {
   try {
@@ -861,25 +862,26 @@ export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ succes
     await ensureSalesSheetExists();
 
     const now = new Date().toISOString();
+    // Lista Vendas: 18 colunas fixas (fonte: webhook + fallback Página1 para UTMs + Leads_Automacao para nome)
     const row = [
-      formatDateBR(saleData.purchaseDate || now),     // DATA COMPRA
-      formatDateBR(saleData.paymentDate || now),      // DATA PAGAMENTO
-      saleData.checkout.toUpperCase(),                // CHECKOUT
-      saleData.transactionId || '',                   // ID TRANSAÇÃO
-      mapPlanName(saleData.plan),                     // PLANO
-      formatCurrency(saleData.grossValue),            // VALOR BRUTO
-      formatCurrency(saleData.netValue),              // VALOR LÍQUIDO
-      saleData.paymentMethod || '',                   // FORMA DE PAGAMENTO
-      saleData.name || '',                            // NOME
-      saleData.email || '',                           // E-MAIL
-      saleData.phone || '',                           // TELEFONE
-      mapOfferName(saleData.plan, saleData.offerName), // NOME DA OFERTA
-      saleData.utmSource || '',                       // UTM_SOURCE
-      saleData.utmCampaign || '',                     // UTM_CAMPAIGN
-      saleData.utmMedium || '',                       // UTM_MEDIUM
-      saleData.utmContent || '',                      // UTM_CONTENT
-      saleData.utmTerm || '',                         // UTM_TERM
-      saleData.coupon || '',                          // CUPOM
+      formatDateBR(saleData.purchaseDate || now),      // A  DATA COMPRA
+      formatDateBR(saleData.paymentDate || now),       // B  DATA PAGAMENTO
+      saleData.checkout.toUpperCase(),                 // C  CHECKOUT
+      saleData.transactionId ?? '',                    // D  ID TRANSAÇÃO
+      mapPlanName(saleData.plan),                      // E  PLANO
+      formatCurrency(saleData.grossValue),             // F  VALOR BRUTO
+      formatCurrency(saleData.netValue),               // G  VALOR LÍQUIDO
+      saleData.paymentMethod ?? '',                    // H  FORMA DE PAGAMENTO
+      saleData.name ?? '',                             // I  NOME
+      saleData.email ?? '',                            // J  E-MAIL
+      saleData.phone ?? '',                            // K  TELEFONE
+      mapOfferName(saleData.plan, saleData.offerName), // L  NOME DA OFERTA
+      saleData.utmSource ?? '',                        // M  UTM_SOURCE
+      saleData.utmCampaign ?? '',                      // N  UTM_CAMPAIGN
+      saleData.utmMedium ?? '',                        // O  UTM_MEDIUM
+      saleData.utmContent ?? '',                       // P  UTM_CONTENT
+      saleData.utmTerm ?? '',                          // Q  UTM_TERM
+      saleData.coupon ?? '',                           // R  CUPOM
     ];
 
     await sheets.spreadsheets.values.append({
