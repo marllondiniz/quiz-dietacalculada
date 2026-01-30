@@ -252,6 +252,56 @@ export async function findLeadByEmailOrPhone(
   return { lead: null, rowIndex: -1 };
 }
 
+/** Nome da aba principal do quiz (onde ficam UTMs do checkout) */
+const MAIN_SHEET_NAME = 'Página1';
+
+/** Índices na aba Página1: G=email(6), H=phone(7), AD=utm_source(29), AE=utm_medium(30), AF=utm_campaign(31), AG=utm_term(32), AH=utm_content(33) */
+const MAIN_SHEET_UTM_INDEXES = {
+  email: 6,
+  phone: 7,
+  utm_source: 29,
+  utm_medium: 30,
+  utm_campaign: 31,
+  utm_term: 32,
+  utm_content: 33,
+};
+
+/**
+ * Busca UTMs do lead na aba principal (Página1) por email ou telefone.
+ * Usado quando o webhook de venda não envia UTMs (ex: Hubla payment event).
+ */
+export async function findLeadUTMsInMainSheet(
+  email?: string,
+  phone?: string
+): Promise<{ utmSource: string; utmCampaign: string; utmMedium: string; utmContent: string; utmTerm: string } | null> {
+  if (!email && !phone) return null;
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  const normPhone = normalizePhone(phone);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${MAIN_SHEET_NAME}'!A:AH`,
+  });
+  const rows = response.data.values || [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowEmail = (row[MAIN_SHEET_UTM_INDEXES.email] || '').toString().trim().toLowerCase();
+    const rowPhone = (row[MAIN_SHEET_UTM_INDEXES.phone] || '').toString().trim();
+    const matchByEmail = email && rowEmail === email.trim().toLowerCase();
+    const matchByPhone = phone && normPhone && normalizePhone(rowPhone) === normPhone;
+    if (matchByEmail || matchByPhone) {
+      return {
+        utmSource: (row[MAIN_SHEET_UTM_INDEXES.utm_source] || '').toString().trim(),
+        utmCampaign: (row[MAIN_SHEET_UTM_INDEXES.utm_campaign] || '').toString().trim(),
+        utmMedium: (row[MAIN_SHEET_UTM_INDEXES.utm_medium] || '').toString().trim(),
+        utmContent: (row[MAIN_SHEET_UTM_INDEXES.utm_content] || '').toString().trim(),
+        utmTerm: (row[MAIN_SHEET_UTM_INDEXES.utm_term] || '').toString().trim(),
+      };
+    }
+  }
+  return null;
+}
+
 /**
  * Normaliza número de telefone removendo caracteres especiais
  */
@@ -802,7 +852,8 @@ function mapOfferName(plan?: string, offerName?: string): string {
 }
 
 /**
- * Salva uma venda na aba "Lista Vendas"
+ * Salva uma venda na aba "Lista Vendas".
+ * Garante as 18 colunas (A–R) sempre preenchidas; valores ausentes viram string vazia ou data/hora atual.
  */
 export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ success: boolean; message: string }> {
   try {
@@ -811,25 +862,26 @@ export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ succes
     await ensureSalesSheetExists();
 
     const now = new Date().toISOString();
+    // Lista Vendas: 18 colunas fixas (fonte: webhook + fallback Página1 para UTMs + Leads_Automacao para nome)
     const row = [
-      formatDateBR(saleData.purchaseDate || now),     // DATA COMPRA
-      formatDateBR(saleData.paymentDate || now),      // DATA PAGAMENTO
-      saleData.checkout.toUpperCase(),                // CHECKOUT
-      saleData.transactionId || '',                   // ID TRANSAÇÃO
-      mapPlanName(saleData.plan),                     // PLANO
-      formatCurrency(saleData.grossValue),            // VALOR BRUTO
-      formatCurrency(saleData.netValue),              // VALOR LÍQUIDO
-      saleData.paymentMethod || '',                   // FORMA DE PAGAMENTO
-      saleData.name || '',                            // NOME
-      saleData.email || '',                           // E-MAIL
-      saleData.phone || '',                           // TELEFONE
-      mapOfferName(saleData.plan, saleData.offerName), // NOME DA OFERTA
-      saleData.utmSource || '',                       // UTM_SOURCE
-      saleData.utmCampaign || '',                     // UTM_CAMPAIGN
-      saleData.utmMedium || '',                       // UTM_MEDIUM
-      saleData.utmContent || '',                      // UTM_CONTENT
-      saleData.utmTerm || '',                         // UTM_TERM
-      saleData.coupon || '',                          // CUPOM
+      formatDateBR(saleData.purchaseDate || now),      // A  DATA COMPRA
+      formatDateBR(saleData.paymentDate || now),       // B  DATA PAGAMENTO
+      saleData.checkout.toUpperCase(),                 // C  CHECKOUT
+      saleData.transactionId ?? '',                    // D  ID TRANSAÇÃO
+      mapPlanName(saleData.plan),                      // E  PLANO
+      formatCurrency(saleData.grossValue),             // F  VALOR BRUTO
+      formatCurrency(saleData.netValue),               // G  VALOR LÍQUIDO
+      saleData.paymentMethod ?? '',                    // H  FORMA DE PAGAMENTO
+      saleData.name ?? '',                             // I  NOME
+      saleData.email ?? '',                            // J  E-MAIL
+      saleData.phone ?? '',                            // K  TELEFONE
+      mapOfferName(saleData.plan, saleData.offerName), // L  NOME DA OFERTA
+      saleData.utmSource ?? '',                        // M  UTM_SOURCE
+      saleData.utmCampaign ?? '',                      // N  UTM_CAMPAIGN
+      saleData.utmMedium ?? '',                        // O  UTM_MEDIUM
+      saleData.utmContent ?? '',                       // P  UTM_CONTENT
+      saleData.utmTerm ?? '',                          // Q  UTM_TERM
+      saleData.coupon ?? '',                           // R  CUPOM
     ];
 
     await sheets.spreadsheets.values.append({
