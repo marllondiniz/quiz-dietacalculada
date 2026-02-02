@@ -128,15 +128,21 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
+      // Cache-busting com timestamp para evitar cache do navegador/CDN
+      const timestamp = Date.now();
       const url = typeof window !== 'undefined' 
-        ? `${window.location.origin}/api/dashboard` 
-        : '/api/dashboard';
+        ? `${window.location.origin}/api/dashboard?_t=${timestamp}` 
+        : `/api/dashboard?_t=${timestamp}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const res = await fetch(url, {
         cache: 'no-store',
         signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        },
       });
       clearTimeout(timeoutId);
 
