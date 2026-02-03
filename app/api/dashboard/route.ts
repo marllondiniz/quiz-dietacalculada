@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getGoogleSheetsInstance } from '@/lib/leadsAutomation';
 
+// Força a rota a ser dinâmica (não cachear)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type SheetsInstance = Awaited<ReturnType<typeof getGoogleSheetsInstance>>['sheets'];
 
 const KEYS = ['pagina1', 'listaVendas', 'leadsAutomacao', 'gastosTrafico'] as const;
@@ -128,7 +132,13 @@ export async function GET() {
 
     body._meta = { fetchedAt: new Date().toISOString() };
 
-    return NextResponse.json(body);
+    return NextResponse.json(body, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erro ao carregar dados do dashboard';
     console.error('[dashboard]', message);
