@@ -852,6 +852,34 @@ function mapOfferName(plan?: string, offerName?: string): string {
 }
 
 /**
+ * Monta a linha (18 colunas) que será escrita na aba "Lista Vendas".
+ * Exportado para testes e dry-run (validar dados antes de gravar).
+ */
+export function buildSalesRow(saleData: SaleData): string[] {
+  const now = new Date().toISOString();
+  return [
+    formatDateBR(saleData.purchaseDate || now),      // A  DATA COMPRA
+    formatDateBR(saleData.paymentDate || now),       // B  DATA PAGAMENTO
+    saleData.checkout.toUpperCase(),                 // C  CHECKOUT
+    saleData.transactionId ?? '',                    // D  ID TRANSAÇÃO
+    mapPlanName(saleData.plan),                      // E  PLANO
+    formatCurrency(saleData.grossValue),             // F  VALOR BRUTO
+    formatCurrency(saleData.netValue),               // G  VALOR LÍQUIDO
+    saleData.paymentMethod ?? '',                    // H  FORMA DE PAGAMENTO
+    saleData.name ?? '',                             // I  NOME
+    saleData.email ?? '',                            // J  E-MAIL
+    saleData.phone ?? '',                            // K  TELEFONE
+    mapOfferName(saleData.plan, saleData.offerName), // L  NOME DA OFERTA
+    saleData.utmSource ?? '',                        // M  UTM_SOURCE
+    saleData.utmCampaign ?? '',                      // N  UTM_CAMPAIGN
+    saleData.utmMedium ?? '',                        // O  UTM_MEDIUM
+    saleData.utmContent ?? '',                       // P  UTM_CONTENT
+    saleData.utmTerm ?? '',                          // Q  UTM_TERM
+    saleData.coupon ?? '',                           // R  CUPOM
+  ];
+}
+
+/**
  * Salva uma venda na aba "Lista Vendas".
  * Garante as 18 colunas (A–R) sempre preenchidas; valores ausentes viram string vazia ou data/hora atual.
  */
@@ -861,28 +889,7 @@ export async function saveSaleToSalesSheet(saleData: SaleData): Promise<{ succes
     
     await ensureSalesSheetExists();
 
-    const now = new Date().toISOString();
-    // Lista Vendas: 18 colunas fixas (fonte: webhook + fallback Página1 para UTMs + Leads_Automacao para nome)
-    const row = [
-      formatDateBR(saleData.purchaseDate || now),      // A  DATA COMPRA
-      formatDateBR(saleData.paymentDate || now),       // B  DATA PAGAMENTO
-      saleData.checkout.toUpperCase(),                 // C  CHECKOUT
-      saleData.transactionId ?? '',                    // D  ID TRANSAÇÃO
-      mapPlanName(saleData.plan),                      // E  PLANO
-      formatCurrency(saleData.grossValue),             // F  VALOR BRUTO
-      formatCurrency(saleData.netValue),               // G  VALOR LÍQUIDO
-      saleData.paymentMethod ?? '',                    // H  FORMA DE PAGAMENTO
-      saleData.name ?? '',                             // I  NOME
-      saleData.email ?? '',                            // J  E-MAIL
-      saleData.phone ?? '',                            // K  TELEFONE
-      mapOfferName(saleData.plan, saleData.offerName), // L  NOME DA OFERTA
-      saleData.utmSource ?? '',                        // M  UTM_SOURCE
-      saleData.utmCampaign ?? '',                      // N  UTM_CAMPAIGN
-      saleData.utmMedium ?? '',                        // O  UTM_MEDIUM
-      saleData.utmContent ?? '',                       // P  UTM_CONTENT
-      saleData.utmTerm ?? '',                          // Q  UTM_TERM
-      saleData.coupon ?? '',                           // R  CUPOM
-    ];
+    const row = buildSalesRow(saleData);
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,

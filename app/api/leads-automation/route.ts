@@ -8,7 +8,9 @@ import {
   AUTOMATION_HEADERS,
   CheckoutSource,
   saveSaleToSalesSheet,
+  buildSalesRow,
   SaleData,
+  SALES_HEADERS,
   findLeadByEmailOrPhone,
   findLeadUTMsInMainSheet,
 } from '@/lib/leadsAutomation';
@@ -106,9 +108,14 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET - Retorna status e documentação do endpoint
+ * GET - Retorna status e documentação do endpoint.
+ * GET ?test=sheet - Dry-run: testa extração Hubla e a linha que seria enviada à planilha (sem gravar).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const testSheet = request.nextUrl.searchParams.get('test') === 'sheet';
+  if (testSheet) {
+    return runSheetDryRunTest();
+  }
   try {
     const leads = await getAllLeads();
 
@@ -300,11 +307,12 @@ function detectCaktoEventType(body: any): DetectedEventData {
 function extractHublaData(body: any): DetectedEventData['data'] {
   // Suporte a múltiplas estruturas: body.event (padrão), body.data, body.payload ou top-level
   const event = body.event || body.data || body.payload || body;
+  const data = body.data || body.event || {};
   const lead = event.lead || body.lead || {};
   const customer = event.customer || event.buyer || event.user || body.customer || body.buyer || {};
   const invoice = event.invoice || body.invoice || {};
   const payment = event.payment || invoice.payment || body.payment || {};
-  const offer = event.offer || event.product || body.offer || body.product || {};
+  const offer = event.offer || event.product || body.offer || body.product || data.offer || data.product || {};
   const subscription = event.subscription || body.subscription || {};
   const utm = event.utm || customer.utm || body.utm || {};
 
@@ -315,16 +323,45 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   const fullName = source.fullName || source.full_name || source.name || source.nome || body.name || body.nome || '';
   const firstName = fullName.split(' ')[0] || fullName;
 
-  // Extrair valores (vários caminhos possíveis no payload da Hubla)
-  const grossValueRaw = invoice.total ?? invoice.amount ?? payment.amount ?? payment.value ?? event.amount ?? event.total ?? body.amount ?? body.total;
-  const netValueRaw = invoice.netAmount ?? invoice.net_amount ?? payment.netAmount ?? payment.net_amount ?? body.netAmount ?? body.net_amount;
   const parseNum = (v: unknown): number | undefined => {
     if (v == null) return undefined;
     const n = typeof v === 'number' ? v : parseFloat(String(v));
     return Number.isFinite(n) ? n : undefined;
   };
-  const grossValue = parseNum(grossValueRaw);
-  const netValue = parseNum(netValueRaw);
+
+  // Valor bruto: invoice, payment, event, body.data e body (Hubla pode enviar em data.amount, data.total, valor_bruto, etc.)
+  const grossValueRaw =
+    invoice.total ?? invoice.amount ?? invoice.value ??
+    payment.amount ?? payment.value ?? payment.total ??
+    event.amount ?? event.total ?? event.value ??
+    data.amount ?? data.total ?? data.value ?? data.valor_bruto ?? data.valorBruto ??
+    body.amount ?? body.total ?? body.value ?? body.valor_bruto ?? body.valorBruto;
+  let grossValue = parseNum(grossValueRaw);
+  // Se valor vier em centavos (ex.: 9700 para R$ 97,00), converter
+  if (grossValue != null && grossValue > 1000 && grossValue < 1000000 && Number.isInteger(grossValue)) {
+    const asReais = grossValue / 100;
+    if (asReais >= 10 && asReais <= 500) grossValue = asReais;
+  }
+
+  // Valor líquido: netAmount, net_amount, valor_liquido; ou calcular: bruto - taxas
+  let netValueRaw =
+    invoice.netAmount ?? invoice.net_amount ?? invoice.netValue ??
+    payment.netAmount ?? payment.net_amount ?? payment.netValue ?? payment.net_value ??
+    event.netAmount ?? event.net_amount ?? event.netValue ?? event.net_value ??
+    data.netAmount ?? data.net_amount ?? data.netValue ?? data.valor_liquido ?? data.valorLiquido ??
+    body.netAmount ?? body.net_amount ?? body.netValue ?? body.valor_liquido ?? body.valorLiquido;
+  let netValue = parseNum(netValueRaw);
+  if (netValue == null && grossValue != null) {
+    const fees = payment.fees ?? event.fees ?? data.fees ?? body.fees;
+    if (Array.isArray(fees) && fees.length > 0) {
+      const totalFees = fees.reduce((acc: number, f: any) => acc + (parseNum(f.amount) ?? 0), 0);
+      if (totalFees > 0) netValue = Math.max(0, grossValue - totalFees);
+    }
+  }
+  if (netValue != null && netValue > 1000 && netValue < 1000000 && Number.isInteger(netValue)) {
+    const asReais = netValue / 100;
+    if (asReais >= 10 && asReais <= 500) netValue = asReais;
+  }
 
   // Extrair forma de pagamento
   let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || body.paymentMethod || '';
@@ -332,13 +369,20 @@ function extractHublaData(body: any): DetectedEventData['data'] {
     paymentMethod = mapPaymentMethod(paymentMethod);
   }
 
-  // Extrair plano (anual/mensal): priorizar tipo de plano; se vier só nome da oferta (ex: "Dieta Calculada"), inferir pelo valor quando houver
-  let plan = (offer.name || subscription.plan || event.plan || body.plan || '').toString().trim();
+  // Extrair plano: offer.name, subscription.plan, data.plan, body.plan; se vier só nome da oferta (ex: "Dieta Calculada"), inferir anual/mensal pelo valor
+  let plan = (
+    offer.name ?? offer.title ??
+    subscription.plan ?? subscription.name ??
+    event.plan ?? event.product?.name ??
+    data.plan ?? data.product?.name ?? data.offer?.name ??
+    body.plan ?? body.product?.name ??
+    ''
+  ).toString().trim();
   const planLower = plan.toLowerCase();
   const isPlanType = planLower.includes('annual') || planLower.includes('anual') || planLower.includes('monthly') || planLower.includes('mensal');
   if (grossValue != null) {
     if (!isPlanType || !plan) {
-      // Nome de produto (ex: "Dieta Calculada") ou plano vazio: inferir pelo valor
+      // Nome de produto (ex: "Dieta Calculada") ou plano vazio: inferir pelo valor (R$ ~97 anual, ~47 mensal)
       plan = grossValue >= 90 ? 'annual' : 'monthly';
     }
   } else if (!plan) {
@@ -350,13 +394,13 @@ function extractHublaData(body: any): DetectedEventData['data'] {
     FirstName: firstName,
     email: (source.email || body.email || '').toString().trim().toLowerCase() || undefined,
     phone: normalizePhone(source.phone || source.telefone || body.phone || body.telefone),
-    // Dados de venda
-    transactionId: invoice.id || payment.id || event.id || body.id,
+    // Dados de venda (incluir data.id para payloads tipo { type, data: { id, amount, ... } })
+    transactionId: invoice.id || payment.id || event.id || data.id || body.id,
     plan: plan || undefined,
     grossValue: grossValue ?? undefined,
     netValue: netValue ?? undefined,
     paymentMethod: paymentMethod,
-    offerName: offer.name || offer.title || subscription.name || '',
+    offerName: offer.name || offer.title || subscription.name || data.offer?.name || '',
     purchaseDate: event.createdAt || event.created_at || invoice.createdAt || body.createdAt,
     paymentDate: payment.paidAt || payment.paid_at || invoice.paidAt || event.paidAt,
     // UTMs (vários caminhos: event, customer, top-level)
@@ -385,6 +429,117 @@ function normalizePhone(phone: any): string | undefined {
   if (!phone || typeof phone !== 'string') return undefined;
   const cleaned = phone.replace(/\D/g, '');
   return cleaned.length >= 8 ? cleaned : undefined;
+}
+
+/**
+ * Teste dry-run: simula payloads Hubla, extrai dados e monta a linha da planilha (sem gravar).
+ * GET /api/leads-automation?test=sheet
+ */
+function runSheetDryRunTest(): NextResponse {
+  const mockPayloads: Array<{ name: string; body: any }> = [
+    {
+      name: 'Hubla data.amount (centavos)',
+      body: {
+        type: 'payment.succeeded',
+        data: {
+          id: 'pay-test-123',
+          amount: 9700,
+          currency: 'BRL',
+          method: 'pix',
+        },
+      },
+    },
+    {
+      name: 'Hubla body.amount + oferta',
+      body: {
+        type: 'invoice.payment.approved',
+        amount: 97,
+        total: 97,
+        plan: 'Dieta Calculada',
+        offer: { name: 'Dieta Calculada' },
+        event: { lead: { name: 'Maria Teste', email: 'maria@teste.com', phone: '11999999999' } },
+      },
+    },
+    {
+      name: 'Hubla valor em reais + netAmount',
+      body: {
+        type: 'sale.created',
+        amount: 47,
+        total: 47,
+        netAmount: 44,
+        net_amount: 44,
+        offer: { name: 'Dieta Calculada' },
+        event: { customer: { fullName: 'João Teste', email: 'joao@teste.com' } },
+      },
+    },
+  ];
+
+  const results: Array<{
+    name: string;
+    eventType: string;
+    extracted?: { plan?: string; grossValue?: number; netValue?: number; transactionId?: string };
+    saleData?: Partial<SaleData>;
+    rowForSheet?: string[];
+    error?: string;
+  }> = [];
+
+  for (const { name, body } of mockPayloads) {
+    try {
+      const { eventType, data } = detectEventType(body, 'hubla');
+      if (eventType !== 'sale_approved') {
+        results.push({ name, eventType, error: 'Não detectado como sale_approved' });
+        continue;
+      }
+      const saleData: SaleData = {
+        purchaseDate: data.purchaseDate,
+        paymentDate: data.paymentDate,
+        checkout: 'hubla',
+        transactionId: data.transactionId,
+        plan: data.plan,
+        grossValue: data.grossValue,
+        netValue: data.netValue,
+        paymentMethod: data.paymentMethod,
+        name: data.FirstName || 'Teste',
+        email: data.email || 'teste@teste.com',
+        phone: data.phone || '',
+        offerName: data.offerName,
+        utmSource: data.utmSource,
+        utmCampaign: data.utmCampaign,
+        utmMedium: data.utmMedium,
+        utmContent: data.utmContent,
+        utmTerm: data.utmTerm,
+        coupon: data.coupon,
+      };
+      const rowForSheet = buildSalesRow(saleData);
+      results.push({
+        name,
+        eventType,
+        extracted: {
+          plan: data.plan,
+          grossValue: data.grossValue,
+          netValue: data.netValue,
+          transactionId: data.transactionId,
+        },
+        saleData: {
+          plan: saleData.plan,
+          grossValue: saleData.grossValue,
+          netValue: saleData.netValue,
+          paymentMethod: saleData.paymentMethod,
+          name: saleData.name,
+        },
+        rowForSheet,
+      });
+    } catch (err: any) {
+      results.push({ name, eventType: 'error', error: err?.message || String(err) });
+    }
+  }
+
+  return NextResponse.json({
+    test: 'sheet',
+    description: 'Dry-run: dados extraídos e linha que seria enviada à aba "Lista Vendas" (não grava na planilha)',
+    columnHeaders: SALES_HEADERS,
+    results,
+  });
 }
 
 // ==========================================
