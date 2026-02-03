@@ -792,7 +792,7 @@ export default function DashboardPage() {
                                   fill="#cbd5e1" 
                                   stroke="none" 
                                   dataKey="value" 
-                                  formatter={(v: number) => `${v.toLocaleString('pt-BR')}`}
+                                  formatter={(value: unknown) => typeof value === 'number' ? value.toLocaleString('pt-BR') : String(value ?? '')}
                                   style={{ fontSize: '13px' }}
                                 />
                               </Funnel>
