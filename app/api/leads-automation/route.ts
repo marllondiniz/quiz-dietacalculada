@@ -313,6 +313,9 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   const invoice = event.invoice || body.invoice || {};
   const payment = event.payment || invoice.payment || body.payment || {};
   const offer = event.offer || event.product || body.offer || body.product || data.offer || data.product || {};
+  const products = event.products || body.products || data.products || [];
+  const firstProduct = Array.isArray(products) ? products[0] : undefined;
+  const firstOfferFromProducts = firstProduct?.offers?.[0] || {};
   const subscription = event.subscription || body.subscription || {};
   const utm = event.utm || customer.utm || body.utm || {};
 
@@ -330,7 +333,10 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   };
 
   // Valor bruto: invoice, payment, event, body.data e body (Hubla pode enviar em data.amount, data.total, valor_bruto, etc.)
+  const invoiceTotalCents =
+    invoice.amount?.totalCents ?? invoice.amount?.total_cents ?? invoice.amount?.total ?? undefined;
   const grossValueRaw =
+    invoiceTotalCents ??
     invoice.total ?? invoice.amount ?? invoice.value ??
     payment.amount ?? payment.value ?? payment.total ??
     event.amount ?? event.total ?? event.value ??
@@ -344,7 +350,12 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   }
 
   // Valor líquido: netAmount, net_amount, valor_liquido; ou calcular: bruto - taxas
+  const receiverTotalCents =
+    Array.isArray(invoice.receivers) && invoice.receivers.length > 0
+      ? (invoice.receivers[0]?.totalCents ?? invoice.receivers[0]?.total_cents)
+      : undefined;
   let netValueRaw =
+    receiverTotalCents ??
     invoice.netAmount ?? invoice.net_amount ?? invoice.netValue ??
     payment.netAmount ?? payment.net_amount ?? payment.netValue ?? payment.net_value ??
     event.netAmount ?? event.net_amount ?? event.netValue ?? event.net_value ??
@@ -369,8 +380,9 @@ function extractHublaData(body: any): DetectedEventData['data'] {
     paymentMethod = mapPaymentMethod(paymentMethod);
   }
 
-  // Extrair plano: offer.name, subscription.plan, data.plan, body.plan; se vier só nome da oferta (ex: "Dieta Calculada"), inferir anual/mensal pelo valor
+  // Extrair plano: offer.name, products[0].offers[0].name, subscription.plan, data.plan, body.plan
   let plan = (
+    firstOfferFromProducts.name ?? firstOfferFromProducts.title ??
     offer.name ?? offer.title ??
     subscription.plan ?? subscription.name ??
     event.plan ?? event.product?.name ??
@@ -400,7 +412,7 @@ function extractHublaData(body: any): DetectedEventData['data'] {
     grossValue: grossValue ?? undefined,
     netValue: netValue ?? undefined,
     paymentMethod: paymentMethod,
-    offerName: offer.name || offer.title || subscription.name || data.offer?.name || '',
+    offerName: firstOfferFromProducts.name || firstOfferFromProducts.title || offer.name || offer.title || subscription.name || data.offer?.name || '',
     purchaseDate: event.createdAt || event.created_at || invoice.createdAt || body.createdAt,
     paymentDate: payment.paidAt || payment.paid_at || invoice.paidAt || event.paidAt,
     // UTMs (vários caminhos: event, customer, top-level)
