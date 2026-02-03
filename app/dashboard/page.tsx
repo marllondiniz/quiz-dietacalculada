@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { DatePicker } from '@/components/DatePicker';
 import {
   PieChart,
   Pie,
@@ -114,6 +115,35 @@ const IconMegaphone = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 8v8M18 6v12M21.5 4v16" />
   </svg>
 );
+const IconFilter = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+  </svg>
+);
+const IconX = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+/** Normaliza texto para comparação (minúsculo, sem acentos) */
+function normalizeHeader(h: string): string {
+  return String(h || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+/** Encontra índice da coluna pelo nome (ou variações) */
+function findColumnIndex(headers: string[], ...names: string[]): number {
+  for (const name of names) {
+    const n = normalizeHeader(name);
+    const idx = headers.findIndex((h) => normalizeHeader(h) === n || normalizeHeader(h).includes(n) || n.includes(normalizeHeader(h)));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
 
 const TABS = [
   { id: 'resumo', label: 'Resumo', Icon: IconChart },
@@ -159,6 +189,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('resumo');
+  // Filtros do resumo
+  const [filterDateFrom, setFilterDateFrom] = useState<string>('');
+  const [filterDateTo, setFilterDateTo] = useState<string>('');
+  const [filterCampanha, setFilterCampanha] = useState<string>('');
+  const [filterConjunto, setFilterConjunto] = useState<string>('');
+  const [filterAnuncio, setFilterAnuncio] = useState<string>('');
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -203,6 +240,294 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  const emptyResumo = useMemo(() => ({
+    filteredVendas: [] as string[][],
+    totalVendasValue: 0,
+    totalVendasLiquido: 0,
+    vendasPorCheckout: {} as Record<string, number>,
+    vendasPorPlanoExibir: [] as [string, number][],
+    vendasPorCampanha: {} as Record<string, number>,
+    vendasPorFormaPagamento: { pix: 0, cartaoCredito: 0 },
+    amountSpentTotal: 0,
+    roi: null as number | null,
+    filteredLeadsCount: 0,
+    filteredPurchasedCount: 0,
+    filteredZaiaCount: 0,
+    filteredLeadsAutomacaoCount: 0,
+    filteredGastosCount: 0,
+    quizFunnelData: [] as Array<{ name: string; value: number }>,
+    opcoesCampanha: [] as string[],
+    opcoesConjunto: [] as string[],
+    opcoesAnuncio: [] as string[],
+  }), []);
+
+  const filteredResumo = useMemo(() => {
+    if (!data) return emptyResumo;
+    /** Parseia data em vários formatos (dd/mm/yyyy, yyyy-mm-dd, etc.) */
+    const parseDate = (raw: string): Date | null => {
+      const s = String(raw || '').trim();
+      if (!s) return null;
+      const iso = /^\d{4}-\d{2}-\d{2}/.exec(s);
+      if (iso) {
+        const d = new Date(s);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      const parts = s.split(/[/\-.]/);
+      if (parts.length >= 3) {
+        if (parts[0].length === 4) {
+          const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          return Number.isNaN(d.getTime()) ? null : d;
+        }
+        const d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(s);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    const vendasHeaders = data.listaVendas?.headers ?? [];
+    const vendasRows = data.listaVendas?.rows ?? [];
+    const gastosHeaders = data.gastosTrafico?.headers ?? [];
+    const gastosRows = data.gastosTrafico?.rows ?? [];
+    const pagina1Headers = data.pagina1?.headers ?? [];
+    const pagina1Rows = data.pagina1?.rows ?? [];
+    const leadsAutomacaoHeaders = data.leadsAutomacao?.headers ?? [];
+    const leadsAutomacaoRows = data.leadsAutomacao?.rows ?? [];
+
+    const vendasDateIdx = findColumnIndex(vendasHeaders, 'data', 'date', 'Data', 'DATA', 'dia');
+    const vendasCampanhaIdx = findColumnIndex(vendasHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
+    const vendasCampanhaIdxRes = vendasCampanhaIdx >= 0 ? vendasCampanhaIdx : 13;
+    const vendasConjuntoIdx = findColumnIndex(vendasHeaders, 'utm_content', 'adset', 'conjunto', 'Ad Set');
+    const vendasAnuncioIdx = findColumnIndex(vendasHeaders, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+
+    const gastosDateIdx = findColumnIndex(gastosHeaders, 'date', 'data', 'Data', 'Day', 'reporting_date');
+    const gastosCampanhaIdx = findColumnIndex(gastosHeaders, 'campaign name', 'campaign', 'campanha', 'Campaign Name');
+    const gastosConjuntoIdx = findColumnIndex(gastosHeaders, 'ad set name', 'adset', 'conjunto', 'Ad Set Name');
+    const gastosAnuncioIdx = findColumnIndex(gastosHeaders, 'ad name', 'ad', 'anúncio', 'Ad Name');
+
+    const dateFrom = filterDateFrom ? new Date(filterDateFrom) : null;
+    const dateTo = filterDateTo ? new Date(filterDateTo) : null;
+    if (dateTo) dateTo.setHours(23, 59, 59, 999);
+
+    const filterVendasRow = (row: string[]): boolean => {
+      if (dateFrom || dateTo) {
+        const idx = vendasDateIdx >= 0 ? vendasDateIdx : 0;
+        const d = parseDate(row[idx]);
+        if (d) {
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+        }
+      }
+      if (filterCampanha && vendasCampanhaIdxRes >= 0) {
+        const val = String(row[vendasCampanhaIdxRes] ?? '').trim();
+        if (val !== filterCampanha) return false;
+      }
+      if (filterConjunto && vendasConjuntoIdx >= 0) {
+        const val = String(row[vendasConjuntoIdx] ?? '').trim();
+        if (val !== filterConjunto) return false;
+      }
+      if (filterAnuncio && vendasAnuncioIdx >= 0) {
+        const val = String(row[vendasAnuncioIdx] ?? '').trim();
+        if (val !== filterAnuncio) return false;
+      }
+      return true;
+    };
+
+    const filterGastosRow = (row: string[]): boolean => {
+      if (dateFrom || dateTo) {
+        const idx = gastosDateIdx >= 0 ? gastosDateIdx : 0;
+        const d = parseDate(row[idx]);
+        if (d) {
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+        }
+      }
+      if (filterCampanha && gastosCampanhaIdx >= 0) {
+        const val = String(row[gastosCampanhaIdx] ?? '').trim();
+        if (val !== filterCampanha) return false;
+      }
+      if (filterConjunto && gastosConjuntoIdx >= 0) {
+        const val = String(row[gastosConjuntoIdx] ?? '').trim();
+        if (val !== filterConjunto) return false;
+      }
+      if (filterAnuncio && gastosAnuncioIdx >= 0) {
+        const val = String(row[gastosAnuncioIdx] ?? '').trim();
+        if (val !== filterAnuncio) return false;
+      }
+      return true;
+    };
+
+    const pagina1DateIdx = findColumnIndex(pagina1Headers, 'data', 'date', 'Data', 'DATA', 'dia');
+    const pagina1CampanhaIdx = findColumnIndex(pagina1Headers, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
+    const pagina1ConjuntoIdx = findColumnIndex(pagina1Headers, 'utm_content', 'adset', 'conjunto', 'Ad Set');
+    const pagina1AnuncioIdx = findColumnIndex(pagina1Headers, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+
+    const filterPagina1Row = (row: string[]): boolean => {
+      if (dateFrom || dateTo) {
+        const idx = pagina1DateIdx >= 0 ? pagina1DateIdx : 0;
+        const d = parseDate(row[idx]);
+        if (d) {
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+        }
+      }
+      if (filterCampanha && pagina1CampanhaIdx >= 0) {
+        const val = String(row[pagina1CampanhaIdx] ?? '').trim();
+        if (val !== filterCampanha) return false;
+      }
+      if (filterConjunto && pagina1ConjuntoIdx >= 0) {
+        const val = String(row[pagina1ConjuntoIdx] ?? '').trim();
+        if (val !== filterConjunto) return false;
+      }
+      if (filterAnuncio && pagina1AnuncioIdx >= 0) {
+        const val = String(row[pagina1AnuncioIdx] ?? '').trim();
+        if (val !== filterAnuncio) return false;
+      }
+      return true;
+    };
+
+    const leadsAutomacaoDateIdx = findColumnIndex(leadsAutomacaoHeaders, 'data', 'date', 'Data', 'DATA', 'dia');
+    const leadsAutomacaoCampanhaIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
+    const leadsAutomacaoConjuntoIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_content', 'adset', 'conjunto', 'Ad Set');
+    const leadsAutomacaoAnuncioIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+
+    const filterLeadsAutomacaoRow = (row: string[]): boolean => {
+      if (dateFrom || dateTo) {
+        const idx = leadsAutomacaoDateIdx >= 0 ? leadsAutomacaoDateIdx : 0;
+        const d = parseDate(row[idx]);
+        if (d) {
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
+        }
+      }
+      if (filterCampanha && leadsAutomacaoCampanhaIdx >= 0) {
+        const val = String(row[leadsAutomacaoCampanhaIdx] ?? '').trim();
+        if (val !== filterCampanha) return false;
+      }
+      if (filterConjunto && leadsAutomacaoConjuntoIdx >= 0) {
+        const val = String(row[leadsAutomacaoConjuntoIdx] ?? '').trim();
+        if (val !== filterConjunto) return false;
+      }
+      if (filterAnuncio && leadsAutomacaoAnuncioIdx >= 0) {
+        const val = String(row[leadsAutomacaoAnuncioIdx] ?? '').trim();
+        if (val !== filterAnuncio) return false;
+      }
+      return true;
+    };
+
+    const filteredVendas = vendasRows.filter(filterVendasRow);
+    const filteredGastos = gastosRows.filter(filterGastosRow);
+    const filteredPagina1 = pagina1Rows.filter(filterPagina1Row);
+    const filteredLeadsAutomacao = leadsAutomacaoRows.filter(filterLeadsAutomacaoRow);
+
+    const filteredLeadsCount = filteredPagina1.length;
+    const filteredLeadsAutomacaoCount = filteredLeadsAutomacao.length;
+    const filteredPurchasedCount = filteredLeadsAutomacao.filter(
+      (row) => String(row[5] || '').toLowerCase() === 'true'
+    ).length;
+    const filteredZaiaCount = filteredLeadsAutomacao.filter(
+      (row) => String(row[6] || '').toLowerCase() === 'true'
+    ).length;
+
+    // Funil do quiz (baseado na aba Página1)
+    const quizSteps = [
+      { name: 'Gênero', test: (row: string[]) => !!row[2] },
+      { name: 'Treinos/semana', test: (row: string[]) => !!row[3] },
+      { name: 'Já usou apps', test: (row: string[]) => !!row[4] },
+      { name: 'Contato (nome)', test: (row: string[]) => !!row[5] },
+      { name: 'Contato (email/telefone)', test: (row: string[]) => !!row[6] || !!row[7] },
+      { name: 'Altura e peso', test: (row: string[]) => !!row[8] && !!row[9] },
+      { name: 'Nascimento', test: (row: string[]) => !!row[11] },
+      { name: 'Objetivo', test: (row: string[]) => !!row[15] },
+      { name: 'Obstáculos', test: (row: string[]) => !!row[18] },
+      { name: 'Tipo de dieta', test: (row: string[]) => !!row[19] },
+      { name: 'Conquistas', test: (row: string[]) => !!row[20] },
+      { name: 'Checkout gerado', test: (row: string[]) => !!row[23] },
+    ];
+
+    const quizFunnelData = quizSteps.map((step) => ({
+      name: step.name,
+      value: filteredPagina1.filter((row) => step.test(row)).length,
+    }));
+
+    const totalVendasValue = filteredVendas.reduce((acc, row) => {
+      const raw = String(row[5] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+      const num = parseFloat(raw);
+      return acc + (Number.isNaN(num) ? 0 : num);
+    }, 0);
+    const totalVendasLiquido = filteredVendas.reduce((acc, row) => {
+      const raw = String(row[6] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+      const num = parseFloat(raw);
+      return acc + (Number.isNaN(num) ? 0 : num);
+    }, 0);
+    const vendasPorCheckout = filteredVendas.reduce((acc, row) => {
+      const checkout = String(row[2] || '').toUpperCase();
+      if (checkout === 'HUBLA' || checkout === 'CAKTO') acc[checkout] = (acc[checkout] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const PLANO_INV = /^plano(\s*1)?$/i;
+    const vendasPorPlano = filteredVendas.reduce((acc, row) => {
+      const plano = String(row[4] || '').trim();
+      if (plano && !PLANO_INV.test(plano)) acc[plano] = (acc[plano] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const vendasPorPlanoExibir = Object.entries(vendasPorPlano).filter(([p]) => !PLANO_INV.test(String(p).trim()));
+    const vendasPorCampanha = filteredVendas.reduce((acc, row) => {
+      const campanha = String(row[vendasCampanhaIdxRes] ?? '').trim();
+      if (campanha) acc[campanha] = (acc[campanha] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const indiceForma = findColumnIndex(vendasHeaders, 'forma de pagamento', 'forma pagamento', 'payment');
+    const indiceFormaRes = indiceForma >= 0 ? indiceForma : 7;
+    const vendasPorFormaPagamento = filteredVendas.reduce((acc, row) => {
+      const raw = String(row[indiceFormaRes] ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (raw.includes('pix')) acc.pix += 1;
+      else if (raw.includes('credito') || raw.includes('credit') || (raw.includes('cartao') && !raw.includes('debito'))) acc.cartaoCredito += 1;
+      return acc;
+    }, { pix: 0, cartaoCredito: 0 });
+
+    const amountSpentIdx = gastosHeaders.findIndex((h) => normalizeHeader(h) === 'amount spent' || normalizeHeader(h).includes('amount'));
+    const amountSpentTotal = amountSpentIdx >= 0 ? filteredGastos.reduce((acc, row) => {
+      const raw = String(row[amountSpentIdx] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+      const num = parseFloat(raw);
+      return acc + (Number.isNaN(num) ? 0 : num);
+    }, 0) : 0;
+
+    const roi = amountSpentTotal > 0
+      ? ((totalVendasValue - amountSpentTotal) / amountSpentTotal) * 100
+      : null;
+
+    const allCampanhas = new Set<string>();
+    vendasRows.forEach((r) => { const v = vendasCampanhaIdxRes >= 0 ? String(r[vendasCampanhaIdxRes] ?? '').trim() : ''; if (v) allCampanhas.add(v); });
+    gastosRows.forEach((r) => { const v = gastosCampanhaIdx >= 0 ? String(r[gastosCampanhaIdx] ?? '').trim() : ''; if (v) allCampanhas.add(v); });
+    const allConjuntos = new Set<string>();
+    vendasRows.forEach((r) => { if (vendasConjuntoIdx >= 0) { const v = String(r[vendasConjuntoIdx] ?? '').trim(); if (v) allConjuntos.add(v); } });
+    gastosRows.forEach((r) => { if (gastosConjuntoIdx >= 0) { const v = String(r[gastosConjuntoIdx] ?? '').trim(); if (v) allConjuntos.add(v); } });
+    const allAnuncios = new Set<string>();
+    vendasRows.forEach((r) => { if (vendasAnuncioIdx >= 0) { const v = String(r[vendasAnuncioIdx] ?? '').trim(); if (v) allAnuncios.add(v); } });
+    gastosRows.forEach((r) => { if (gastosAnuncioIdx >= 0) { const v = String(r[gastosAnuncioIdx] ?? '').trim(); if (v) allAnuncios.add(v); } });
+
+    return {
+      filteredVendas,
+      totalVendasValue,
+      totalVendasLiquido,
+      vendasPorCheckout,
+      vendasPorPlanoExibir,
+      vendasPorCampanha,
+      vendasPorFormaPagamento,
+      amountSpentTotal,
+      roi,
+      filteredLeadsCount,
+      filteredPurchasedCount,
+      filteredZaiaCount,
+      filteredLeadsAutomacaoCount,
+      filteredGastosCount: filteredGastos.length,
+      quizFunnelData,
+      opcoesCampanha: Array.from(allCampanhas).sort(),
+      opcoesConjunto: Array.from(allConjuntos).sort(),
+      opcoesAnuncio: Array.from(allAnuncios).sort(),
+    };
+  }, [data, filterDateFrom, filterDateTo, filterCampanha, filterConjunto, filterAnuncio, emptyResumo]);
+
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
@@ -240,68 +565,31 @@ export default function DashboardPage() {
 
   if (!data) return null;
 
-  const purchasedCount =
-    data.leadsAutomacao?.rows?.filter(
-      (row) => String(row[5] || '').toLowerCase() === 'true'
-    ).length ?? 0;
+  const {
+    totalVendasValue,
+    totalVendasLiquido,
+    vendasPorCheckout,
+    vendasPorPlanoExibir,
+    vendasPorCampanha,
+    vendasPorFormaPagamento,
+    amountSpentTotal,
+    roi,
+    filteredVendas,
+    filteredLeadsCount,
+    filteredPurchasedCount,
+    filteredZaiaCount,
+    filteredLeadsAutomacaoCount,
+    filteredGastosCount,
+    quizFunnelData,
+    opcoesCampanha,
+    opcoesConjunto,
+    opcoesAnuncio,
+  } = filteredResumo;
 
-  const totalLeadsAutomacao = data.leadsAutomacao?.totalRows ?? 0;
-  const zaiaEnviadosCount =
-    data.leadsAutomacao?.rows?.filter(
-      (row) => String(row[6] || '').toLowerCase() === 'true'
-    ).length ?? 0;
-  const conversionRate = totalLeadsAutomacao > 0 
-    ? (purchasedCount / totalLeadsAutomacao * 100).toFixed(1) 
+  const conversionRate = filteredLeadsAutomacaoCount > 0
+    ? (filteredPurchasedCount / filteredLeadsAutomacaoCount * 100).toFixed(1)
     : '0.0';
 
-  const totalVendasValue = (data.listaVendas?.rows ?? []).reduce((acc, row) => {
-    const raw = String(row[5] || '')
-      .replace(/[^\d.,]/g, '')
-      .replace(/\./g, '')
-      .replace(',', '.');
-    const num = parseFloat(raw);
-    return acc + (Number.isNaN(num) ? 0 : num);
-  }, 0);
-
-  const totalVendasLiquido = (data.listaVendas?.rows ?? []).reduce((acc, row) => {
-    const raw = String(row[6] || '')
-      .replace(/[^\d.,]/g, '')
-      .replace(/\./g, '')
-      .replace(',', '.');
-    const num = parseFloat(raw);
-    return acc + (Number.isNaN(num) ? 0 : num);
-  }, 0);
-
-  const vendasPorCheckout = (data.listaVendas?.rows ?? []).reduce((acc, row) => {
-    const checkout = String(row[2] || '').toUpperCase();
-    if (checkout === 'HUBLA' || checkout === 'CAKTO') {
-      acc[checkout] = (acc[checkout] || 0) + 1;
-    }
-    return acc;
-  }, {} as Record<string, number>);
-
-  const PLANO_INVALIDO = /^plano(\s*1)?$/i;
-  const vendasPorPlano = (data.listaVendas?.rows ?? []).reduce((acc, row) => {
-    const plano = String(row[4] || '').trim();
-    if (plano && !PLANO_INVALIDO.test(plano)) {
-      acc[plano] = (acc[plano] || 0) + 1;
-    }
-    return acc;
-  }, {} as Record<string, number>);
-  const vendasPorPlanoExibir = Object.entries(vendasPorPlano).filter(
-    ([plano]) => !PLANO_INVALIDO.test(String(plano).trim())
-  );
-
-  // Lista Vendas: coluna N = índice 13 (UTM_CAMPAIGN)
-  const INDICE_UTM_CAMPAIGN = 13;
-  const vendasPorCampanha = (data.listaVendas?.rows ?? []).reduce(
-    (acc, row) => {
-      const campanha = String(row[INDICE_UTM_CAMPAIGN] ?? '').trim();
-      if (campanha) acc[campanha] = (acc[campanha] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
   const melhorAnuncio = (() => {
     const entries = Object.entries(vendasPorCampanha);
     if (entries.length === 0) return null;
@@ -312,40 +600,14 @@ export default function DashboardPage() {
     return { nome: best[0], vendas: best[1] };
   })();
 
-  // Coluna H = índice 7 (FORMA DE PAGAMENTO) - mesmo padrão que row[2], row[4], row[5], row[6]
-  const INDICE_FORMA_PAGAMENTO = 7;
-  const vendasPorFormaPagamento = (data.listaVendas?.rows ?? []).reduce(
-    (acc, row) => {
-      const raw = String(row[INDICE_FORMA_PAGAMENTO] ?? '').trim().toLowerCase();
-      const forma = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (forma.includes('pix')) acc.pix += 1;
-      else if (
-        forma.includes('credito') ||
-        forma.includes('credit') ||
-        (forma.includes('cartao') && !forma.includes('debito'))
-      )
-        acc.cartaoCredito += 1;
-      return acc;
-    },
-    { pix: 0, cartaoCredito: 0 }
-  );
-
-  const amountSpentTotal = (() => {
-    const sheet = data.gastosTrafico;
-    if (!sheet?.headers?.length || !sheet?.rows?.length) return 0;
-    const idx = sheet.headers.findIndex(
-      (h) => String(h || '').toLowerCase().trim() === 'amount spent'
-    );
-    if (idx === -1) return 0;
-    return sheet.rows.reduce((acc, row) => {
-      const raw = String(row[idx] || '')
-        .replace(/[^\d.,]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.');
-      const num = parseFloat(raw);
-      return acc + (Number.isNaN(num) ? 0 : num);
-    }, 0);
-  })();
+  const hasActiveFilters = filterDateFrom || filterDateTo || filterCampanha || filterConjunto || filterAnuncio;
+  const clearFilters = () => {
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setFilterCampanha('');
+    setFilterConjunto('');
+    setFilterAnuncio('');
+  };
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -416,28 +678,133 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {activeTab === 'resumo' && (
           <section className="space-y-6">
+            {/* Filtros */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-visible" lang="pt-BR">
+              <button
+                type="button"
+                onClick={() => setFilterOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-white font-medium hover:bg-slate-700/30 transition-colors"
+                aria-expanded={filterOpen}
+                aria-controls="painel-filtros-dashboard"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <IconFilter className="w-5 h-5 text-sky-400" />
+                  Filtros
+                  {hasActiveFilters && (
+                    <span className="text-xs bg-sky-500/30 text-sky-300 px-2 py-0.5 rounded-full">
+                      ativos
+                    </span>
+                  )}
+                </span>
+                <span className="text-slate-400 text-sm">{filteredVendas.length} vendas no período</span>
+              </button>
+              {filterOpen && (
+                <div id="painel-filtros-dashboard" className="px-4 pb-4 pt-0 border-t border-slate-700/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <DatePicker
+                    id="filtro-data-inicio"
+                    label="Data de início"
+                    value={filterDateFrom}
+                    onChange={setFilterDateFrom}
+                    title="Selecione a data de início do período"
+                    placeholder="Selecione a data"
+                  />
+                  <DatePicker
+                    id="filtro-data-fim"
+                    label="Data de fim"
+                    value={filterDateTo}
+                    onChange={setFilterDateTo}
+                    title="Selecione a data de fim do período"
+                    placeholder="Selecione a data"
+                  />
+                  <div>
+                    <label htmlFor="filtro-campanha" className="block text-xs font-medium text-slate-400 mb-1">Campanha</label>
+                    <select
+                      id="filtro-campanha"
+                      value={filterCampanha}
+                      onChange={(e) => setFilterCampanha(e.target.value)}
+                      title="Filtrar por campanha"
+                      className="w-full rounded-lg bg-slate-700/50 border border-slate-600 text-white px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    >
+                      <option value="">Todas as campanhas</option>
+                      {opcoesCampanha.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="filtro-conjunto" className="block text-xs font-medium text-slate-400 mb-1">Conjunto de anúncios</label>
+                    <select
+                      id="filtro-conjunto"
+                      value={filterConjunto}
+                      onChange={(e) => setFilterConjunto(e.target.value)}
+                      title="Filtrar por conjunto de anúncios"
+                      className="w-full rounded-lg bg-slate-700/50 border border-slate-600 text-white px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    >
+                      <option value="">Todos os conjuntos</option>
+                      {opcoesConjunto.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="filtro-anuncio" className="block text-xs font-medium text-slate-400 mb-1">Anúncio</label>
+                    <select
+                      id="filtro-anuncio"
+                      value={filterAnuncio}
+                      onChange={(e) => setFilterAnuncio(e.target.value)}
+                      title="Filtrar por anúncio"
+                      className="w-full rounded-lg bg-slate-700/50 border border-slate-600 text-white px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    >
+                      <option value="">Todos os anúncios</option>
+                      {opcoesAnuncio.map((a) => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {hasActiveFilters && (
+                    <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        title="Remover todos os filtros"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white text-sm font-medium rounded-lg border border-slate-600 hover:bg-slate-700/50 transition-colors"
+                      >
+                        <IconX className="w-4 h-4" />
+                        Limpar filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Hero - Receita em Destaque */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-6 sm:p-8">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOGMxLjI1NCAwIDIuNDgtLjEyOCAzLjY2LS4zNzEiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjIiLz48L2c+PC9zdmc+')] opacity-30" />
               <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
-                  <p className="text-emerald-100 text-sm font-medium mb-1">Receita Total</p>
+                  <p className="text-emerald-100 text-sm font-medium mb-1">Receita Total {hasActiveFilters && '(filtrado)'}</p>
                   <p className="text-white text-4xl sm:text-5xl font-bold tracking-tight">
                     {totalVendasValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                   <p className="text-emerald-100 text-sm mt-2">
                     Líquido: <span className="font-semibold text-white">{totalVendasLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    {roi !== null && (
+                      <span className="ml-3 text-emerald-200">
+                        ROI: <span className="font-semibold text-white">{roi >= 0 ? '+' : ''}{roi.toFixed(1)}%</span>
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
                   <IconCart className="w-5 h-5 text-white" />
-                  <span className="text-white font-semibold">{data.listaVendas?.totalRows ?? 0} vendas</span>
+                  <span className="text-white font-semibold">{filteredVendas.length} vendas</span>
                 </div>
               </div>
             </div>
 
-            {/* Cards principais em grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Cards principais em grid (inclui ROI) */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-sky-500/30 transition-colors">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
@@ -445,7 +812,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads</p>
-                <p className="text-white text-2xl font-bold mt-1">{data.pagina1?.totalRows ?? 0}</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsCount}</p>
                 <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
                   <div className="h-full bg-sky-500 rounded-full" style={{ width: '100%' }} />
                 </div>
@@ -458,7 +825,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
-                <p className="text-white text-2xl font-bold mt-1">{purchasedCount}</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredPurchasedCount}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-green-400 text-sm font-semibold">{conversionRate}%</span>
                   <span className="text-slate-500 text-xs">taxa</span>
@@ -475,7 +842,7 @@ export default function DashboardPage() {
                 <p className="text-white text-2xl font-bold mt-1">
                   {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-slate-500 text-xs mt-2">{data.gastosTrafico?.totalRows ?? 0} campanhas</p>
+                <p className="text-slate-500 text-xs mt-2">{filteredGastosCount} campanhas</p>
               </div>
 
               <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-purple-500/30 transition-colors">
@@ -485,8 +852,23 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Automação</p>
-                <p className="text-white text-2xl font-bold mt-1">{zaiaEnviadosCount}</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredZaiaCount}</p>
                 <p className="text-slate-500 text-xs mt-2">enviados Zaia</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <IconTrending className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">ROI</p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {roi !== null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+                </p>
+                <p className="text-slate-500 text-xs mt-2">
+                  Investido: {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                </p>
               </div>
             </div>
 
@@ -646,59 +1028,49 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Funil de conversão - Design melhorado */}
-            <div className="bg-gradient-to-br from-slate-800 via-slate-800/95 to-slate-800/90 backdrop-blur rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-700/50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-bold text-xl mb-1">Funil de conversão</h3>
-                    <p className="text-slate-400 text-sm">Acompanhe a jornada do lead até a conversão</p>
+            {/* Funil do Quiz - Design Premium */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800/95 to-slate-900 border border-slate-700/60 shadow-2xl">
+              {/* Background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                  backgroundImage: `radial-gradient(circle at 2px 2px, rgb(148 163 184) 1px, transparent 0)`,
+                  backgroundSize: '32px 32px'
+                }} />
+              </div>
+              
+              <div className="relative p-6 border-b border-slate-700/50">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500/20 to-emerald-500/20 border border-sky-500/30">
+                      <IconChart className="w-6 h-6 text-sky-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-2xl mb-1">Funil do Quiz</h3>
+                      <p className="text-slate-400 text-sm">Analise a jornada completa dos leads</p>
+                    </div>
                   </div>
-                  <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-700/30 rounded-lg border border-slate-600/30">
-                    <IconChart className="w-5 h-5 text-sky-400" />
-                    <span className="text-slate-300 text-sm font-medium">Taxa geral: {(() => {
-                      const leadsQuiz = data.pagina1?.totalRows ?? 0;
-                      return leadsQuiz > 0 ? ((purchasedCount / leadsQuiz) * 100).toFixed(1) : '0.0';
-                    })()}%</span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 px-4 py-3">
+                      <p className="text-slate-400 text-xs mb-1">Leads iniciaram</p>
+                      <p className="text-white text-2xl font-bold">{quizFunnelData[0]?.value?.toLocaleString('pt-BR') || 0}</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/40 rounded-xl px-4 py-3">
+                      <p className="text-emerald-300 text-xs mb-1">Taxa de conclusão</p>
+                      <p className="text-white text-2xl font-bold">
+                        {quizFunnelData.length > 1 && quizFunnelData[0].value > 0
+                          ? ((quizFunnelData[quizFunnelData.length - 1].value / quizFunnelData[0].value) * 100).toFixed(1)
+                          : '0.0'}%
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
               {(() => {
-                const leadsQuiz = data.pagina1?.totalRows ?? 0;
-                const funnelData = [
-                  { 
-                    name: 'Leads (Quiz)', 
-                    value: leadsQuiz, 
-                    fill: 'url(#funnelGradient1)',
-                    icon: IconUsers,
-                    color: 'sky',
-                    description: 'Pessoas que completaram o quiz'
-                  },
-                  { 
-                    name: 'Na automação', 
-                    value: totalLeadsAutomacao, 
-                    fill: 'url(#funnelGradient2)',
-                    icon: IconCog,
-                    color: 'indigo',
-                    description: 'Leads na planilha de automação'
-                  },
-                  { 
-                    name: 'Enviados Zaia', 
-                    value: zaiaEnviadosCount, 
-                    fill: 'url(#funnelGradient3)',
-                    icon: IconMegaphone,
-                    color: 'purple',
-                    description: 'Leads que receberam envio Zaia'
-                  },
-                  { 
-                    name: 'Compraram', 
-                    value: purchasedCount, 
-                    fill: 'url(#funnelGradient4)',
-                    icon: IconCheck,
-                    color: 'emerald',
-                    description: 'Conversões realizadas'
-                  },
-                ];
+                const palette = ['#0ea5e9', '#22c55e', '#a855f7', '#f59e0b', '#38bdf8', '#e879f9', '#10b981', '#f97316', '#6366f1', '#14b8a6', '#ef4444', '#84cc16'];
+                const funnelData = quizFunnelData.map((item, idx) => ({
+                  ...item,
+                  fill: palette[idx % palette.length],
+                }));
                 const hasAnyValue = funnelData.some((d) => d.value > 0);
                 if (!hasAnyValue) {
                   return (
@@ -711,64 +1083,61 @@ export default function DashboardPage() {
                   );
                 }
                 
-                // Calcular taxas de conversão
+                // Calcular taxas por etapa
                 const funnelWithRates = funnelData.map((item, idx) => {
                   const prev = idx > 0 ? funnelData[idx - 1].value : item.value;
                   const rate = prev > 0 ? ((item.value / prev) * 100) : 100;
-                  const totalRate = leadsQuiz > 0 ? ((item.value / leadsQuiz) * 100) : 0;
+                  const totalRate = funnelData[0]?.value > 0 ? ((item.value / funnelData[0].value) * 100) : 0;
                   return { ...item, rate, totalRate };
                 });
 
                 return (
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Funil visual */}
-                      <div className="lg:col-span-2">
-                        <div className="h-96 relative">
+                  <div className="relative p-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Funil visual aprimorado */}
+                      <div className="relative">
+                        <div className="absolute -top-2 -left-2 w-20 h-20 bg-sky-500/10 rounded-full blur-2xl" />
+                        <div className="absolute -bottom-2 -right-2 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl" />
+                        <div className="relative h-[500px] rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/40 p-6 backdrop-blur-sm">
                           <ResponsiveContainer width="100%" height="100%">
                             <FunnelChart>
-                              <defs>
-                                <linearGradient id="funnelGradient1" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.9} />
-                                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0.7} />
-                                </linearGradient>
-                                <linearGradient id="funnelGradient2" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
-                                  <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
-                                </linearGradient>
-                                <linearGradient id="funnelGradient3" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
-                                  <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.7} />
-                                </linearGradient>
-                                <linearGradient id="funnelGradient4" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.9} />
-                                  <stop offset="100%" stopColor="#059669" stopOpacity={0.7} />
-                                </linearGradient>
-                              </defs>
                               <Tooltip
                                 content={({ active, payload }) => {
                                   if (!active || !payload?.length) return null;
                                   const p = payload[0].payload;
                                   const item = funnelWithRates.find((d) => d.name === p.name);
                                   if (!item) return null;
+                                  const idx = funnelData.findIndex((d) => d.name === item.name);
                                   return (
-                                    <div className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 shadow-xl min-w-[200px]">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        {item.icon && <item.icon className="w-4 h-4 text-sky-400" />}
-                                        <p className="text-white font-semibold">{p.name}</p>
+                                    <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-xl px-5 py-4 shadow-2xl min-w-[240px]">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-sky-500/20 text-sky-300 text-xs font-bold">
+                                          {idx + 1}
+                                        </span>
+                                        <p className="text-white font-bold text-base">{p.name}</p>
                                       </div>
-                                      <p className="text-slate-300 text-lg font-bold mb-1">{p.value.toLocaleString('pt-BR')} pessoas</p>
-                                      <p className="text-slate-400 text-xs mb-2">{item.description}</p>
-                                      {item.rate < 100 && (
-                                        <div className="pt-2 border-t border-slate-700">
-                                          <p className="text-sky-400 text-xs">
-                                            Taxa de conversão: <span className="font-semibold">{item.rate.toFixed(1)}%</span>
-                                          </p>
-                                          <p className="text-slate-500 text-xs mt-1">
-                                            Do total inicial: <span className="text-slate-400">{item.totalRate.toFixed(1)}%</span>
-                                          </p>
+                                      <div className="space-y-3">
+                                        <div className="flex items-baseline gap-2">
+                                          <p className="text-white text-3xl font-bold">{p.value.toLocaleString('pt-BR')}</p>
+                                          <span className="text-slate-400 text-sm">pessoas</span>
                                         </div>
-                                      )}
+                                        <div className="space-y-2 pt-3 border-t border-slate-700">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 text-xs">Taxa da etapa</span>
+                                            <span className="text-emerald-400 font-bold text-sm">{item.rate.toFixed(1)}%</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-slate-400 text-xs">Do total inicial</span>
+                                            <span className="text-sky-400 font-semibold text-sm">{item.totalRate.toFixed(1)}%</span>
+                                          </div>
+                                          {idx > 0 && (
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-slate-400 text-xs">Abandonaram</span>
+                                              <span className="text-amber-400 font-semibold text-sm">{(100 - item.rate).toFixed(1)}%</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                   );
                                 }}
@@ -777,23 +1146,23 @@ export default function DashboardPage() {
                                 dataKey="value" 
                                 data={funnelData} 
                                 isAnimationActive
-                                animationDuration={800}
+                                animationDuration={1000}
                               >
                                 <LabelList 
                                   position="center" 
                                   fill="#fff" 
                                   stroke="none" 
                                   dataKey="name" 
-                                  className="text-sm font-semibold"
-                                  style={{ fontSize: '14px', fontWeight: 600 }}
+                                  className="text-sm font-bold drop-shadow-lg"
+                                  style={{ fontSize: '14px', fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
                                 />
                                 <LabelList 
                                   position="right" 
-                                  fill="#cbd5e1" 
+                                  fill="#e2e8f0" 
                                   stroke="none" 
                                   dataKey="value" 
                                   formatter={(value: unknown) => typeof value === 'number' ? value.toLocaleString('pt-BR') : String(value ?? '')}
-                                  style={{ fontSize: '13px' }}
+                                  style={{ fontSize: '14px', fontWeight: 600 }}
                                 />
                               </Funnel>
                             </FunnelChart>
@@ -801,83 +1170,104 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      {/* Cards informativos */}
+                      {/* Análise de etapas */}
                       <div className="space-y-4">
-                        {funnelWithRates.map((item, idx) => {
-                          const IconComponent = item.icon;
-                          const colorConfig = {
-                            sky: {
-                              bg: 'from-sky-500/20 to-sky-600/10 border-sky-500/30',
-                              iconBg: 'bg-sky-500/20',
-                              iconColor: 'text-sky-400',
-                              textColor: 'text-sky-400',
-                            },
-                            indigo: {
-                              bg: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
-                              iconBg: 'bg-indigo-500/20',
-                              iconColor: 'text-indigo-400',
-                              textColor: 'text-indigo-400',
-                            },
-                            purple: {
-                              bg: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
-                              iconBg: 'bg-purple-500/20',
-                              iconColor: 'text-purple-400',
-                              textColor: 'text-purple-400',
-                            },
-                            emerald: {
-                              bg: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
-                              iconBg: 'bg-emerald-500/20',
-                              iconColor: 'text-emerald-400',
-                              textColor: 'text-emerald-400',
-                            },
-                          };
-                          const colors = colorConfig[item.color as keyof typeof colorConfig] || colorConfig.sky;
-                          return (
-                            <div 
-                              key={item.name}
-                              className={`bg-gradient-to-br ${colors.bg} rounded-xl border p-4 transition-all hover:scale-[1.02] hover:shadow-lg`}
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  {IconComponent && (
-                                    <div className={`p-2 rounded-lg ${colors.iconBg}`}>
-                                      <IconComponent className={`w-4 h-4 ${colors.iconColor}`} />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="text-white font-semibold text-sm">{item.name}</p>
-                                    <p className="text-slate-400 text-xs mt-0.5">{item.description}</p>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex items-baseline gap-2">
-                                  <p className="text-white text-2xl font-bold">{item.value.toLocaleString('pt-BR')}</p>
-                                  <span className="text-slate-400 text-xs">pessoas</span>
-                                </div>
-                                {idx > 0 && item.rate < 100 && (
-                                  <div className="pt-2 border-t border-slate-700/50">
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-slate-400">Taxa etapa:</span>
-                                      <span className={`font-semibold ${colors.textColor}`}>{item.rate.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs mt-1">
-                                      <span className="text-slate-400">Do total:</span>
-                                      <span className="text-slate-300 font-medium">{item.totalRate.toFixed(1)}%</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {idx === 0 && (
-                                  <div className="pt-2 border-t border-slate-700/50">
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="text-slate-400">Base inicial</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                        {/* Resumo geral */}
+                        <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/60 rounded-2xl border border-slate-700/50 p-5">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 rounded-lg bg-sky-500/10">
+                              <IconUsers className="w-5 h-5 text-sky-400" />
                             </div>
-                          );
-                        })}
+                            <h4 className="text-white font-semibold">Resumo de conversão</h4>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-slate-400 text-xs mb-1">Taxa média</p>
+                              <p className="text-white text-xl font-bold">
+                                {funnelWithRates.length > 0
+                                  ? (funnelWithRates.reduce((acc, item) => acc + item.rate, 0) / funnelWithRates.length).toFixed(1)
+                                  : '0.0'}%
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 text-xs mb-1">Maior queda</p>
+                              <p className="text-amber-400 text-xl font-bold">
+                                {funnelWithRates.length > 1
+                                  ? Math.max(...funnelWithRates.slice(1).map((item) => 100 - item.rate)).toFixed(1)
+                                  : '0.0'}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Lista de etapas com design melhorado */}
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto scrollbar-hide pr-1">
+                          {funnelWithRates.map((item, idx) => {
+                            const drop = 100 - item.rate;
+                            const isCritical = drop > 30;
+                            const isGood = item.rate >= 90;
+                            return (
+                              <div 
+                                key={item.name} 
+                                className="group bg-slate-800/60 hover:bg-slate-800/80 rounded-xl border border-slate-700/50 hover:border-slate-600 p-4 transition-all hover:shadow-lg"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm ${
+                                      isGood ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                      isCritical ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                      'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                                    }`}>
+                                      {idx + 1}
+                                    </span>
+                                    <div>
+                                      <p className="text-white text-sm font-semibold">{item.name}</p>
+                                      {isCritical && (
+                                        <span className="inline-flex items-center gap-1 mt-1 text-xs text-amber-400">
+                                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                          </svg>
+                                          Crítico
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-white text-xl font-bold">{item.value.toLocaleString('pt-BR')}</p>
+                                    <p className="text-slate-400 text-xs">pessoas</p>
+                                  </div>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <span className="text-slate-400">Avançaram da etapa anterior</span>
+                                    <span className={`font-bold ${
+                                      isGood ? 'text-emerald-400' :
+                                      isCritical ? 'text-amber-400' :
+                                      'text-sky-400'
+                                    }`}>
+                                      {item.rate.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                  <div className="h-2.5 rounded-full bg-slate-900/60 overflow-hidden border border-slate-700/50">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-500 ${
+                                        isGood ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
+                                        isCritical ? 'bg-gradient-to-r from-amber-500 to-amber-400' :
+                                        'bg-gradient-to-r from-sky-500 to-sky-400'
+                                      }`}
+                                      style={{ width: `${Math.min(100, Math.max(0, item.rate))}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs pt-1">
+                                    <span className="text-slate-500">Do início: {item.totalRate.toFixed(1)}%</span>
+                                    {idx > 0 && <span className="text-slate-500">Perdidos: {drop.toFixed(1)}%</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
