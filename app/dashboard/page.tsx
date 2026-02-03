@@ -2,6 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  FunnelChart,
+  Funnel,
+  LabelList,
+} from 'recharts';
 
 type SheetData = {
   headers: string[];
@@ -110,6 +125,27 @@ const TABS = [
 
 const ROWS_PER_PAGE = 50;
 const MAX_TABLE_ROWS = 500; // máx. linhas carregadas na tabela (paginação interna)
+
+// Tooltip customizado para os gráficos
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-slate-400 text-xs mb-1">{label}</p>
+      <p className="text-white font-semibold">{payload[0].value} vendas</p>
+    </div>
+  );
+};
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-slate-400 text-xs mb-1">{payload[0].name}</p>
+      <p className="text-white font-semibold">{payload[0].value} vendas</p>
+    </div>
+  );
+};
 
 const IconLogout = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -379,167 +415,474 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {activeTab === 'resumo' && (
-          <section className="space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-slate-700/50 border border-slate-600/50 flex items-center justify-center">
-                <IconChart className="w-5 h-5 text-sky-400" />
-              </div>
-              <div>
-                <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Visão geral</h2>
-                <p className="text-white font-semibold text-lg">Métricas principais</p>
+          <section className="space-y-6">
+            {/* Hero - Receita em Destaque */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-6 sm:p-8">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOGMxLjI1NCAwIDIuNDgtLjEyOCAzLjY2LS4zNzEiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjIiLz48L2c+PC9zdmc+')] opacity-30" />
+              <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div>
+                  <p className="text-emerald-100 text-sm font-medium mb-1">Receita Total</p>
+                  <p className="text-white text-4xl sm:text-5xl font-bold tracking-tight">
+                    {totalVendasValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                  <p className="text-emerald-100 text-sm mt-2">
+                    Líquido: <span className="font-semibold text-white">{totalVendasLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                  <IconCart className="w-5 h-5 text-white" />
+                  <span className="text-white font-semibold">{data.listaVendas?.totalRows ?? 0} vendas</span>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <MetricCard
-                title="Total de Leads"
-                value={data.pagina1?.totalRows ?? 0}
-                subtitle="Quiz"
-                accent="blue"
-                Icon={IconUsers}
-              />
-              <MetricCard
-                title="Total de Vendas"
-                value={data.listaVendas?.totalRows ?? 0}
-                subtitle="Lista Vendas"
-                accent="green"
-                Icon={IconCart}
-              />
-              <MetricCard
-                title="Leads Comprados"
-                value={purchasedCount}
-                subtitle={`${conversionRate}% conversão`}
-                accent="emerald"
-                Icon={IconCheck}
-              />
-              <MetricCard
-                title="Receita Bruta"
-                value={totalVendasValue.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                  minimumFractionDigits: 2,
-                })}
-                subtitle={`Líquido: ${totalVendasLiquido.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                })}`}
-                accent="purple"
-                isLarge
-                Icon={IconCurrency}
-              />
+            {/* Cards principais em grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-sky-500/30 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                    <IconUsers className="w-5 h-5 text-sky-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads</p>
+                <p className="text-white text-2xl font-bold mt-1">{data.pagina1?.totalRows ?? 0}</p>
+                <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-sky-500 rounded-full" style={{ width: '100%' }} />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-green-500/30 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                    <IconCheck className="w-5 h-5 text-green-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
+                <p className="text-white text-2xl font-bold mt-1">{purchasedCount}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-green-400 text-sm font-semibold">{conversionRate}%</span>
+                  <span className="text-slate-500 text-xs">taxa</span>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <IconTrending className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Investido</p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-slate-500 text-xs mt-2">{data.gastosTrafico?.totalRows ?? 0} campanhas</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-purple-500/30 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                    <IconCog className="w-5 h-5 text-purple-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Automação</p>
+                <p className="text-white text-2xl font-bold mt-1">{zaiaEnviadosCount}</p>
+                <p className="text-slate-500 text-xs mt-2">enviados Zaia</p>
+              </div>
             </div>
 
+            {/* Gráficos principais */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Vendas por Plano */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-white font-semibold">Vendas por Plano</h3>
+                  <div className="flex gap-3">
+                    {vendasPorPlanoExibir.map(([plano, count], i) => (
+                      <span key={plano} className="flex items-center gap-1.5 text-xs">
+                        <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-sky-400' : i === 1 ? 'bg-emerald-400' : 'bg-purple-400'}`} />
+                        <span className="text-slate-400">{plano}: <span className="text-white font-medium">{count}</span></span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={vendasPorPlanoExibir.map(([name, count]) => ({ name: name || 'Outro', vendas: count }))} margin={{ top: 8, right: 8, left: -10, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(51 65 85)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
+                      <Bar dataKey="vendas" fill="url(#colorGradient)" radius={[6, 6, 0, 0]} />
+                      <defs>
+                        <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#0ea5e9" />
+                          <stop offset="100%" stopColor="#0284c7" />
+                        </linearGradient>
+                      </defs>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {vendasPorPlanoExibir.length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nenhuma venda registrada</p>}
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-white font-semibold">Forma de Pagamento</h3>
+                  <div className="text-xs text-slate-400">
+                    Total: <span className="text-white font-medium">{vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                      <span className="text-slate-300 text-sm">PIX</span>
+                    </div>
+                    <p className="text-white text-2xl font-bold">{vendasPorFormaPagamento.pix}</p>
+                    <p className="text-emerald-400 text-xs mt-1">
+                      {((vendasPorFormaPagamento.pix / Math.max(1, vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito)) * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-3 h-3 rounded-full bg-sky-400" />
+                      <span className="text-slate-300 text-sm">Cartão</span>
+                    </div>
+                    <p className="text-white text-2xl font-bold">{vendasPorFormaPagamento.cartaoCredito}</p>
+                    <p className="text-sky-400 text-xs mt-1">
+                      {((vendasPorFormaPagamento.cartaoCredito / Math.max(1, vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito)) * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'PIX', value: vendasPorFormaPagamento.pix },
+                          { name: 'Cartão', value: vendasPorFormaPagamento.cartaoCredito },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        <Cell fill="#10b981" stroke="rgb(15 23 42)" strokeWidth={2} />
+                        <Cell fill="#0ea5e9" stroke="rgb(15 23 42)" strokeWidth={2} />
+                      </Pie>
+                      <Tooltip content={<CustomPieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Checkout e Top Campanhas */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h3 className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">
-                  <IconStore className="w-4 h-4 text-sky-400" />
-                  Vendas por Checkout
-                </h3>
-                <div className="space-y-4">
-                  {Object.entries(vendasPorCheckout).map(([checkout, count]) => (
-                    <div key={checkout} className="flex items-center justify-between py-2 border-b border-slate-700 last:border-0">
-                      <span className="text-slate-300 font-medium">{checkout}</span>
-                      <span className="text-white font-semibold tabular-nums">{count}</span>
-                    </div>
-                  ))}
-                  {Object.keys(vendasPorCheckout).length === 0 && (
-                    <p className="text-slate-500 text-sm">Nenhuma venda registrada</p>
-                  )}
+              {/* Checkout */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <h3 className="text-white font-semibold mb-4">Vendas por Checkout</h3>
+                <div className="space-y-3">
+                  {Object.entries(vendasPorCheckout).map(([checkout, count], i) => {
+                    const total = Object.values(vendasPorCheckout).reduce((a, b) => a + b, 0);
+                    const percent = total > 0 ? (count / total) * 100 : 0;
+                    return (
+                      <div key={checkout} className="group">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-slate-300 text-sm font-medium">{checkout}</span>
+                          <span className="text-white font-semibold">{count}</span>
+                        </div>
+                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-gradient-to-r from-sky-500 to-sky-400' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {Object.keys(vendasPorCheckout).length === 0 && <p className="text-slate-500 text-sm text-center py-4">Nenhuma venda</p>}
                 </div>
               </div>
 
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h3 className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">
-                  <IconCurrency className="w-4 h-4 text-sky-400" />
-                  PIX e Cartão de Crédito
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between py-2 border-b border-slate-700">
-                    <span className="text-slate-300 font-medium">PIX</span>
-                    <span className="text-white font-semibold tabular-nums">{vendasPorFormaPagamento.pix}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 last:border-0">
-                    <span className="text-slate-300 font-medium">Cartão de Crédito</span>
-                    <span className="text-white font-semibold tabular-nums">{vendasPorFormaPagamento.cartaoCredito}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h3 className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider mb-4">
-                  <IconList className="w-4 h-4 text-sky-400" />
-                  Vendas por Plano
-                </h3>
-                <div className="space-y-4">
-                  {vendasPorPlanoExibir.map(([plano, count]) => (
-                    <div key={plano} className="flex items-center justify-between py-2 border-b border-slate-700 last:border-0">
-                      <span className="text-slate-300 font-medium">{plano || 'Não especificado'}</span>
-                      <span className="text-white font-semibold tabular-nums">{count}</span>
-                    </div>
-                  ))}
-                  {vendasPorPlanoExibir.length === 0 && (
-                    <p className="text-slate-500 text-sm">Nenhuma venda registrada</p>
+              {/* Top Campanhas */}
+              <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-semibold">Top Campanhas</h3>
+                  {melhorAnuncio && (
+                    <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
+                      Melhor: {melhorAnuncio.vendas} vendas
+                    </span>
                   )}
                 </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={Object.entries(vendasPorCampanha)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 6)
+                        .map(([name, vendas]) => ({ name: name.length > 25 ? name.slice(0, 22) + '…' : name, vendas }))}
+                      margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(51 65 85)" horizontal={false} />
+                      <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" width={140} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
+                      <Bar dataKey="vendas" fill="url(#purpleGradient)" radius={[0, 6, 6, 0]} />
+                      <defs>
+                        <linearGradient id="purpleGradient" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#8b5cf6" />
+                          <stop offset="100%" stopColor="#a78bfa" />
+                        </linearGradient>
+                      </defs>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {Object.keys(vendasPorCampanha).length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nenhuma campanha com vendas</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center flex-shrink-0">
-                  <IconCog className="w-5 h-5 text-slate-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-400 mb-1">Leads Automação</p>
-                  <p className="text-2xl font-semibold text-white tabular-nums">{zaiaEnviadosCount}</p>
-                  <p className="text-xs text-slate-500 mt-1">enviados para Zaia</p>
-                </div>
-              </div>
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-900/40 flex items-center justify-center flex-shrink-0 border border-emerald-700/30">
-                  <IconChart className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-400 mb-1">Taxa de Conversão</p>
-                  <p className="text-2xl font-semibold text-emerald-400 tabular-nums">{conversionRate}%</p>
+            {/* Funil de conversão - Design melhorado */}
+            <div className="bg-gradient-to-br from-slate-800 via-slate-800/95 to-slate-800/90 backdrop-blur rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
+              <div className="p-6 border-b border-slate-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-bold text-xl mb-1">Funil de conversão</h3>
+                    <p className="text-slate-400 text-sm">Acompanhe a jornada do lead até a conversão</p>
+                  </div>
+                  <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-700/30 rounded-lg border border-slate-600/30">
+                    <IconChart className="w-5 h-5 text-sky-400" />
+                    <span className="text-slate-300 text-sm font-medium">Taxa geral: {(() => {
+                      const leadsQuiz = data.pagina1?.totalRows ?? 0;
+                      return leadsQuiz > 0 ? ((purchasedCount / leadsQuiz) * 100).toFixed(1) : '0.0';
+                    })()}%</span>
+                  </div>
                 </div>
               </div>
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-sky-900/40 flex items-center justify-center flex-shrink-0 border border-sky-700/30">
-                  <IconTrending className="w-5 h-5 text-sky-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-400 mb-1">Tráfego pago (Amount Spent)</p>
-                  <p className="text-2xl font-semibold text-white tabular-nums">
-                    {amountSpentTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {data.gastosTrafico?.totalRows ?? 0} registros
-                  </p>
-                </div>
-              </div>
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-900/40 flex items-center justify-center flex-shrink-0 border border-amber-700/30">
-                  <IconMegaphone className="w-5 h-5 text-amber-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-400 mb-1">Melhor anúncio</p>
-                  {melhorAnuncio ? (
-                    <>
-                      <p className="text-xl font-semibold text-white truncate" title={melhorAnuncio.nome}>
-                        {melhorAnuncio.nome}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">{melhorAnuncio.vendas} vendas</p>
-                    </>
-                  ) : (
-                    <p className="text-slate-500 text-sm">Sem dados de campanha</p>
-                  )}
-                </div>
-              </div>
+              {(() => {
+                const leadsQuiz = data.pagina1?.totalRows ?? 0;
+                const funnelData = [
+                  { 
+                    name: 'Leads (Quiz)', 
+                    value: leadsQuiz, 
+                    fill: 'url(#funnelGradient1)',
+                    icon: IconUsers,
+                    color: 'sky',
+                    description: 'Pessoas que completaram o quiz'
+                  },
+                  { 
+                    name: 'Na automação', 
+                    value: totalLeadsAutomacao, 
+                    fill: 'url(#funnelGradient2)',
+                    icon: IconCog,
+                    color: 'indigo',
+                    description: 'Leads na planilha de automação'
+                  },
+                  { 
+                    name: 'Enviados Zaia', 
+                    value: zaiaEnviadosCount, 
+                    fill: 'url(#funnelGradient3)',
+                    icon: IconMegaphone,
+                    color: 'purple',
+                    description: 'Leads que receberam envio Zaia'
+                  },
+                  { 
+                    name: 'Compraram', 
+                    value: purchasedCount, 
+                    fill: 'url(#funnelGradient4)',
+                    icon: IconCheck,
+                    color: 'emerald',
+                    description: 'Conversões realizadas'
+                  },
+                ];
+                const hasAnyValue = funnelData.some((d) => d.value > 0);
+                if (!hasAnyValue) {
+                  return (
+                    <div className="p-12 text-center">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-700/50 mb-4">
+                        <IconChart className="w-8 h-8 text-slate-500" />
+                      </div>
+                      <p className="text-slate-500 text-sm">Sem dados para exibir o funil</p>
+                    </div>
+                  );
+                }
+                
+                // Calcular taxas de conversão
+                const funnelWithRates = funnelData.map((item, idx) => {
+                  const prev = idx > 0 ? funnelData[idx - 1].value : item.value;
+                  const rate = prev > 0 ? ((item.value / prev) * 100) : 100;
+                  const totalRate = leadsQuiz > 0 ? ((item.value / leadsQuiz) * 100) : 0;
+                  return { ...item, rate, totalRate };
+                });
+
+                return (
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Funil visual */}
+                      <div className="lg:col-span-2">
+                        <div className="h-96 relative">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <FunnelChart>
+                              <defs>
+                                <linearGradient id="funnelGradient1" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0.7} />
+                                </linearGradient>
+                                <linearGradient id="funnelGradient2" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
+                                </linearGradient>
+                                <linearGradient id="funnelGradient3" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.7} />
+                                </linearGradient>
+                                <linearGradient id="funnelGradient4" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#059669" stopOpacity={0.7} />
+                                </linearGradient>
+                              </defs>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload?.length) return null;
+                                  const p = payload[0].payload;
+                                  const item = funnelWithRates.find((d) => d.name === p.name);
+                                  if (!item) return null;
+                                  return (
+                                    <div className="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 shadow-xl min-w-[200px]">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        {item.icon && <item.icon className="w-4 h-4 text-sky-400" />}
+                                        <p className="text-white font-semibold">{p.name}</p>
+                                      </div>
+                                      <p className="text-slate-300 text-lg font-bold mb-1">{p.value.toLocaleString('pt-BR')} pessoas</p>
+                                      <p className="text-slate-400 text-xs mb-2">{item.description}</p>
+                                      {item.rate < 100 && (
+                                        <div className="pt-2 border-t border-slate-700">
+                                          <p className="text-sky-400 text-xs">
+                                            Taxa de conversão: <span className="font-semibold">{item.rate.toFixed(1)}%</span>
+                                          </p>
+                                          <p className="text-slate-500 text-xs mt-1">
+                                            Do total inicial: <span className="text-slate-400">{item.totalRate.toFixed(1)}%</span>
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Funnel 
+                                dataKey="value" 
+                                data={funnelData} 
+                                isAnimationActive
+                                animationDuration={800}
+                              >
+                                <LabelList 
+                                  position="center" 
+                                  fill="#fff" 
+                                  stroke="none" 
+                                  dataKey="name" 
+                                  className="text-sm font-semibold"
+                                  style={{ fontSize: '14px', fontWeight: 600 }}
+                                />
+                                <LabelList 
+                                  position="right" 
+                                  fill="#cbd5e1" 
+                                  stroke="none" 
+                                  dataKey="value" 
+                                  formatter={(v: number) => `${v.toLocaleString('pt-BR')}`}
+                                  style={{ fontSize: '13px' }}
+                                />
+                              </Funnel>
+                            </FunnelChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Cards informativos */}
+                      <div className="space-y-4">
+                        {funnelWithRates.map((item, idx) => {
+                          const IconComponent = item.icon;
+                          const colorConfig = {
+                            sky: {
+                              bg: 'from-sky-500/20 to-sky-600/10 border-sky-500/30',
+                              iconBg: 'bg-sky-500/20',
+                              iconColor: 'text-sky-400',
+                              textColor: 'text-sky-400',
+                            },
+                            indigo: {
+                              bg: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
+                              iconBg: 'bg-indigo-500/20',
+                              iconColor: 'text-indigo-400',
+                              textColor: 'text-indigo-400',
+                            },
+                            purple: {
+                              bg: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+                              iconBg: 'bg-purple-500/20',
+                              iconColor: 'text-purple-400',
+                              textColor: 'text-purple-400',
+                            },
+                            emerald: {
+                              bg: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
+                              iconBg: 'bg-emerald-500/20',
+                              iconColor: 'text-emerald-400',
+                              textColor: 'text-emerald-400',
+                            },
+                          };
+                          const colors = colorConfig[item.color as keyof typeof colorConfig] || colorConfig.sky;
+                          return (
+                            <div 
+                              key={item.name}
+                              className={`bg-gradient-to-br ${colors.bg} rounded-xl border p-4 transition-all hover:scale-[1.02] hover:shadow-lg`}
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  {IconComponent && (
+                                    <div className={`p-2 rounded-lg ${colors.iconBg}`}>
+                                      <IconComponent className={`w-4 h-4 ${colors.iconColor}`} />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="text-white font-semibold text-sm">{item.name}</p>
+                                    <p className="text-slate-400 text-xs mt-0.5">{item.description}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-baseline gap-2">
+                                  <p className="text-white text-2xl font-bold">{item.value.toLocaleString('pt-BR')}</p>
+                                  <span className="text-slate-400 text-xs">pessoas</span>
+                                </div>
+                                {idx > 0 && item.rate < 100 && (
+                                  <div className="pt-2 border-t border-slate-700/50">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">Taxa etapa:</span>
+                                      <span className={`font-semibold ${colors.textColor}`}>{item.rate.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs mt-1">
+                                      <span className="text-slate-400">Do total:</span>
+                                      <span className="text-slate-300 font-medium">{item.totalRate.toFixed(1)}%</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {idx === 0 && (
+                                  <div className="pt-2 border-t border-slate-700/50">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">Base inicial</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </section>
         )}
