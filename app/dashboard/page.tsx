@@ -14,6 +14,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Line,
+  Legend,
   FunnelChart,
   Funnel,
   LabelList,
@@ -177,6 +181,40 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   );
 };
 
+const TimelineTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  const leads = payload.find((item: any) => item.dataKey === 'leads')?.value ?? 0;
+  const automacao = payload.find((item: any) => item.dataKey === 'automacao')?.value ?? 0;
+  const vendas = payload.find((item: any) => item.dataKey === 'vendas')?.value ?? 0;
+  const gasto = payload.find((item: any) => item.dataKey === 'gasto')?.value ?? 0;
+
+  return (
+    <div className="bg-slate-900/95 border border-slate-700 rounded-xl px-4 py-3 shadow-xl min-w-[180px]">
+      <p className="text-slate-300 text-xs mb-3">{label}</p>
+      <div className="space-y-1 text-xs">
+        <p className="flex items-center justify-between">
+          <span className="text-sky-300">Leads</span>
+          <span className="text-white font-semibold">{Number(leads).toLocaleString('pt-BR')}</span>
+        </p>
+        <p className="flex items-center justify-between">
+          <span className="text-purple-300">Automação</span>
+          <span className="text-white font-semibold">{Number(automacao).toLocaleString('pt-BR')}</span>
+        </p>
+        <p className="flex items-center justify-between">
+          <span className="text-emerald-300">Vendas</span>
+          <span className="text-white font-semibold">{Number(vendas).toLocaleString('pt-BR')}</span>
+        </p>
+        <p className="flex items-center justify-between">
+          <span className="text-amber-300">Investido</span>
+          <span className="text-white font-semibold">
+            {Number(gasto).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const IconLogout = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -196,6 +234,7 @@ export default function DashboardPage() {
   const [filterConjunto, setFilterConjunto] = useState<string>('');
   const [filterAnuncio, setFilterAnuncio] = useState<string>('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [timelineView, setTimelineView] = useState<'daily' | 'weekly'>('daily');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -250,11 +289,69 @@ export default function DashboardPage() {
     vendasPorFormaPagamento: { pix: 0, cartaoCredito: 0 },
     amountSpentTotal: 0,
     roi: null as number | null,
+    funnelResumo: {
+      leads: 0,
+      automacao: 0,
+      vendas: 0,
+      leadToAutomationRate: null as number | null,
+      automationToSaleRate: null as number | null,
+      leadToSaleRate: null as number | null,
+      tempoMedioConversaoDias: null as number | null,
+      tempoMedioConversaoHoras: null as number | null,
+    },
     filteredLeadsCount: 0,
     filteredPurchasedCount: 0,
     filteredZaiaCount: 0,
     filteredLeadsAutomacaoCount: 0,
     filteredGastosCount: 0,
+    timelineDaily: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
+    timelineWeekly: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
+    segmentacaoOrigem: [] as Array<{ label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
+    segmentacaoDispositivo: [] as Array<{ label: string; leads: number; automacao: number; vendas: number }>,
+    performanceCampanhas: [] as Array<{
+      nome: string;
+      leads: number;
+      vendas: number;
+      gasto: number;
+      receita: number;
+      roi: number | null;
+      cpl: number | null;
+      cpa: number | null;
+    }>,
+    performanceConjuntos: [] as Array<{
+      nome: string;
+      leads: number;
+      vendas: number;
+      gasto: number;
+      receita: number;
+      roi: number | null;
+      cpl: number | null;
+      cpa: number | null;
+    }>,
+    performanceAnuncios: [] as Array<{
+      nome: string;
+      leads: number;
+      vendas: number;
+      gasto: number;
+      receita: number;
+      roi: number | null;
+      cpl: number | null;
+      cpa: number | null;
+    }>,
+    cpl: null as number | null,
+    cpa: null as number | null,
+    ticketMedioBruto: null as number | null,
+    ticketMedioLiquido: null as number | null,
+    automationMetrics: {
+      leadToAutomationRate: null as number | null,
+      automationToSaleRate: null as number | null,
+      leadToSaleRate: null as number | null,
+      tempoMedioConversaoDias: null as number | null,
+      tempoMedioConversaoHoras: null as number | null,
+      processedRate: null as number | null,
+      zaiaParticipation: null as number | null,
+    },
+    alerts: [] as Array<{ tipo: 'info' | 'warning' | 'danger'; mensagem: string }>,
     quizFunnelData: [] as Array<{ name: string; value: number }>,
     opcoesCampanha: [] as string[],
     opcoesConjunto: [] as string[],
@@ -293,16 +390,173 @@ export default function DashboardPage() {
     const leadsAutomacaoHeaders = data.leadsAutomacao?.headers ?? [];
     const leadsAutomacaoRows = data.leadsAutomacao?.rows ?? [];
 
-    const vendasDateIdx = findColumnIndex(vendasHeaders, 'data', 'date', 'Data', 'DATA', 'dia');
-    const vendasCampanhaIdx = findColumnIndex(vendasHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
-    const vendasCampanhaIdxRes = vendasCampanhaIdx >= 0 ? vendasCampanhaIdx : 13;
-    const vendasConjuntoIdx = findColumnIndex(vendasHeaders, 'utm_content', 'adset', 'conjunto', 'Ad Set');
-    const vendasAnuncioIdx = findColumnIndex(vendasHeaders, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+    const resolveIndex = (idx: number, fallback?: number) => (idx >= 0 ? idx : fallback ?? -1);
+    const parseMoney = (value: unknown): number => {
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const raw = String(value ?? '')
+        .replace(/[^\d.,-]/g, '')
+        .replace(/\.(?=\d{3}(?:[^\d]|$))/g, '')
+        .replace(',', '.');
+      const num = parseFloat(raw);
+      return Number.isNaN(num) ? 0 : num;
+    };
+    const toDateKey = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const formatDayMonth = (date: Date) =>
+      date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const getWeekStart = (date: Date) => {
+      const weekStart = new Date(date);
+      weekStart.setHours(0, 0, 0, 0);
+      const day = weekStart.getDay(); // 0 (domingo) - 6 (sábado)
+      const offset = day === 0 ? -6 : 1 - day; // Ajusta para segunda-feira
+      weekStart.setDate(weekStart.getDate() + offset);
+      return weekStart;
+    };
+    const toWeekKey = (date: Date) => {
+      const weekStart = getWeekStart(date);
+      return toDateKey(weekStart);
+    };
+    const normalizeEmail = (value: unknown) => String(value ?? '').trim().toLowerCase();
+    const normalizePhone = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+    const normalizeLabel = (value: unknown, fallback = 'Indefinido') => {
+      const text = String(value ?? '').trim();
+      return text || fallback;
+    };
+    const extractIdentifiers = (
+      row: string[],
+      opts: { emailIdx?: number; phoneIdx?: number; leadIdIdx?: number }
+    ): string[] => {
+      const ids: string[] = [];
+      if (opts.leadIdIdx !== undefined && opts.leadIdIdx >= 0) {
+        const leadId = String(row[opts.leadIdIdx] ?? '').trim();
+        if (leadId) ids.push(`lead:${leadId}`);
+      }
+      if (opts.emailIdx !== undefined && opts.emailIdx >= 0) {
+        const email = normalizeEmail(row[opts.emailIdx]);
+        if (email) ids.push(`email:${email}`);
+      }
+      if (opts.phoneIdx !== undefined && opts.phoneIdx >= 0) {
+        const phone = normalizePhone(row[opts.phoneIdx]);
+        if (phone) ids.push(`phone:${phone}`);
+      }
+      return ids;
+    };
 
-    const gastosDateIdx = findColumnIndex(gastosHeaders, 'date', 'data', 'Data', 'Day', 'reporting_date');
+    const vendasDateIdx = findColumnIndex(vendasHeaders, 'data', 'date', 'dia', 'created_at', 'order date');
+    const vendasValorBrutoIdx = findColumnIndex(
+      vendasHeaders,
+      'valor bruto',
+      'valor total',
+      'total',
+      'gross value',
+      'valor',
+      'amount',
+      'price'
+    );
+    const vendasValorLiquidoIdx = findColumnIndex(
+      vendasHeaders,
+      'valor liquido',
+      'líquido',
+      'liquido',
+      'net value',
+      'received',
+      'neto'
+    );
+    const vendasPlanoIdx = findColumnIndex(vendasHeaders, 'plano', 'produto', 'offer', 'nome plano', 'plano contratado');
+    const vendasCheckoutIdx = findColumnIndex(vendasHeaders, 'checkout', 'origem', 'origem da venda', 'gateway');
+    const vendasCampanhaIdx = findColumnIndex(vendasHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campaign');
+    const vendasCampanhaIdxRes = resolveIndex(
+      resolveIndex(vendasCampanhaIdx, findColumnIndex(vendasHeaders, 'campanha', 'campanha nome')),
+      13
+    );
+    const vendasConjuntoIdx = findColumnIndex(vendasHeaders, 'utm_content', 'adset', 'conjunto', 'ad set', 'adset name');
+    const vendasConjuntoIdxRes = resolveIndex(vendasConjuntoIdx, 15);
+    const vendasAnuncioIdx = findColumnIndex(vendasHeaders, 'utm_term', 'ad_name', 'anúncio', 'ad name');
+    const vendasSourceIdx = findColumnIndex(vendasHeaders, 'utm_source', 'source', 'origem');
+    const vendasMediumIdx = findColumnIndex(vendasHeaders, 'utm_medium', 'medium', 'meio');
+    const vendasFormaPagamentoIdx = findColumnIndex(vendasHeaders, 'forma de pagamento', 'forma pagamento', 'payment', 'metodo pagamento');
+    const vendasEmailIdx = findColumnIndex(vendasHeaders, 'email', 'e-mail', 'email cliente');
+    const vendasTelefoneIdx = findColumnIndex(vendasHeaders, 'telefone', 'phone', 'celular');
+    const vendasLeadIdIdx = findColumnIndex(vendasHeaders, 'lead id', 'id lead', 'lead');
+    const vendasPedidoIdx = findColumnIndex(vendasHeaders, 'pedido', 'order id', 'invoice id', 'transaction id');
+
+    const gastosDateIdx = findColumnIndex(gastosHeaders, 'date', 'data', 'dia', 'Day', 'reporting_date');
     const gastosCampanhaIdx = findColumnIndex(gastosHeaders, 'campaign name', 'campaign', 'campanha', 'Campaign Name');
     const gastosConjuntoIdx = findColumnIndex(gastosHeaders, 'ad set name', 'adset', 'conjunto', 'Ad Set Name');
     const gastosAnuncioIdx = findColumnIndex(gastosHeaders, 'ad name', 'ad', 'anúncio', 'Ad Name');
+    const gastosCanalIdx = findColumnIndex(gastosHeaders, 'utm_source', 'source', 'origem', 'channel');
+    const gastosDeviceIdx = findColumnIndex(gastosHeaders, 'device', 'dispositivo', 'platform');
+    const gastosAmountIdx = findColumnIndex(gastosHeaders, 'amount spent', 'valor gasto', 'spent', 'custo');
+
+    const pagina1DateIdx = findColumnIndex(pagina1Headers, 'data', 'date', 'dia', 'created_at', 'timestamp');
+    const pagina1CampanhaIdx = findColumnIndex(pagina1Headers, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
+    const pagina1ConjuntoIdx = findColumnIndex(pagina1Headers, 'utm_content', 'adset', 'conjunto', 'Ad Set');
+    const pagina1AnuncioIdx = findColumnIndex(pagina1Headers, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+    const pagina1SourceIdx = findColumnIndex(pagina1Headers, 'utm_source', 'source', 'origem');
+    const pagina1MediumIdx = findColumnIndex(pagina1Headers, 'utm_medium', 'medium', 'meio');
+    const pagina1DeviceIdx = findColumnIndex(pagina1Headers, 'device', 'dispositivo', 'plataforma');
+    const pagina1EmailIdx = findColumnIndex(pagina1Headers, 'email', 'e-mail', 'Email');
+    const pagina1TelefoneIdx = findColumnIndex(pagina1Headers, 'telefone', 'phone', 'celular');
+    const pagina1LeadIdIdx = findColumnIndex(pagina1Headers, 'lead id', 'id', 'id lead');
+
+    const leadsAutomacaoDateIdx = findColumnIndex(leadsAutomacaoHeaders, 'data', 'date', 'dia', 'created_at', 'timestamp');
+    const leadsAutomacaoCampanhaIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
+    const leadsAutomacaoConjuntoIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_content', 'adset', 'conjunto', 'Ad Set');
+    const leadsAutomacaoAnuncioIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
+    const leadsAutomacaoSourceIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_source', 'source', 'origem');
+    const leadsAutomacaoMediumIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_medium', 'medium', 'meio');
+    const leadsAutomacaoDeviceIdx = findColumnIndex(leadsAutomacaoHeaders, 'device', 'dispositivo', 'plataforma');
+    const leadsAutomacaoEmailIdx = findColumnIndex(leadsAutomacaoHeaders, 'email', 'e-mail');
+    const leadsAutomacaoTelefoneIdx = findColumnIndex(leadsAutomacaoHeaders, 'telefone', 'phone', 'celular');
+    const leadsAutomacaoLeadIdIdx = findColumnIndex(leadsAutomacaoHeaders, 'lead id', 'id lead', 'lead');
+
+    const vendasDateIdxRes = resolveIndex(vendasDateIdx, 0);
+    const vendasAnuncioIdxRes = resolveIndex(vendasAnuncioIdx, 16);
+    const vendasSourceIdxRes = resolveIndex(vendasSourceIdx);
+    const vendasMediumIdxRes = resolveIndex(vendasMediumIdx);
+    const vendasValorBrutoIdxRes = resolveIndex(vendasValorBrutoIdx, 5);
+    const vendasValorLiquidoIdxRes = resolveIndex(vendasValorLiquidoIdx, 6);
+    const vendasPlanoIdxRes = resolveIndex(vendasPlanoIdx, 4);
+    const vendasCheckoutIdxRes = resolveIndex(vendasCheckoutIdx, 2);
+    const vendasFormaPagamentoIdxRes = resolveIndex(vendasFormaPagamentoIdx, 7);
+    const vendasEmailIdxRes = resolveIndex(vendasEmailIdx);
+    const vendasTelefoneIdxRes = resolveIndex(vendasTelefoneIdx);
+    const vendasLeadIdIdxRes = resolveIndex(vendasLeadIdIdx);
+    const vendasPedidoIdxRes = resolveIndex(vendasPedidoIdx);
+
+    const pagina1DateIdxRes = resolveIndex(pagina1DateIdx, 0);
+    const pagina1CampanhaIdxRes = resolveIndex(pagina1CampanhaIdx, 13);
+    const pagina1ConjuntoIdxRes = resolveIndex(pagina1ConjuntoIdx, 14);
+    const pagina1AnuncioIdxRes = resolveIndex(pagina1AnuncioIdx, 15);
+    const pagina1SourceIdxRes = resolveIndex(pagina1SourceIdx);
+    const pagina1MediumIdxRes = resolveIndex(pagina1MediumIdx);
+    const pagina1DeviceIdxRes = resolveIndex(pagina1DeviceIdx);
+    const pagina1EmailIdxRes = resolveIndex(pagina1EmailIdx, 6);
+    const pagina1TelefoneIdxRes = resolveIndex(pagina1TelefoneIdx, 7);
+    const pagina1LeadIdIdxRes = resolveIndex(pagina1LeadIdIdx);
+
+    const leadsAutomacaoDateIdxRes = resolveIndex(leadsAutomacaoDateIdx, 0);
+    const leadsAutomacaoCampanhaIdxRes = resolveIndex(leadsAutomacaoCampanhaIdx);
+    const leadsAutomacaoConjuntoIdxRes = resolveIndex(leadsAutomacaoConjuntoIdx);
+    const leadsAutomacaoAnuncioIdxRes = resolveIndex(leadsAutomacaoAnuncioIdx);
+    const leadsAutomacaoSourceIdxRes = resolveIndex(leadsAutomacaoSourceIdx);
+    const leadsAutomacaoMediumIdxRes = resolveIndex(leadsAutomacaoMediumIdx);
+    const leadsAutomacaoDeviceIdxRes = resolveIndex(leadsAutomacaoDeviceIdx);
+    const leadsAutomacaoEmailIdxRes = resolveIndex(leadsAutomacaoEmailIdx);
+    const leadsAutomacaoTelefoneIdxRes = resolveIndex(leadsAutomacaoTelefoneIdx);
+    const leadsAutomacaoLeadIdIdxRes = resolveIndex(leadsAutomacaoLeadIdIdx);
+
+    const gastosDateIdxRes = resolveIndex(gastosDateIdx, 0);
+    const gastosCampanhaIdxRes = resolveIndex(gastosCampanhaIdx);
+    const gastosConjuntoIdxRes = resolveIndex(gastosConjuntoIdx);
+    const gastosAnuncioIdxRes = resolveIndex(gastosAnuncioIdx);
+    const gastosCanalIdxRes = resolveIndex(gastosCanalIdx);
+    const gastosDeviceIdxRes = resolveIndex(gastosDeviceIdx);
+    const gastosAmountIdxRes = resolveIndex(gastosAmountIdx);
 
     const dateFrom = filterDateFrom ? new Date(filterDateFrom) : null;
     const dateTo = filterDateTo ? new Date(filterDateTo) : null;
@@ -310,8 +564,7 @@ export default function DashboardPage() {
 
     const filterVendasRow = (row: string[]): boolean => {
       if (dateFrom || dateTo) {
-        const idx = vendasDateIdx >= 0 ? vendasDateIdx : 0;
-        const d = parseDate(row[idx]);
+        const d = parseDate(row[vendasDateIdxRes] ?? row[0]);
         if (d) {
           if (dateFrom && d < dateFrom) return false;
           if (dateTo && d > dateTo) return false;
@@ -321,12 +574,12 @@ export default function DashboardPage() {
         const val = String(row[vendasCampanhaIdxRes] ?? '').trim();
         if (val !== filterCampanha) return false;
       }
-      if (filterConjunto && vendasConjuntoIdx >= 0) {
-        const val = String(row[vendasConjuntoIdx] ?? '').trim();
+      if (filterConjunto && vendasConjuntoIdxRes >= 0) {
+        const val = String(row[vendasConjuntoIdxRes] ?? '').trim();
         if (val !== filterConjunto) return false;
       }
-      if (filterAnuncio && vendasAnuncioIdx >= 0) {
-        const val = String(row[vendasAnuncioIdx] ?? '').trim();
+      if (filterAnuncio && vendasAnuncioIdxRes >= 0) {
+        const val = String(row[vendasAnuncioIdxRes] ?? '').trim();
         if (val !== filterAnuncio) return false;
       }
       return true;
@@ -334,81 +587,68 @@ export default function DashboardPage() {
 
     const filterGastosRow = (row: string[]): boolean => {
       if (dateFrom || dateTo) {
-        const idx = gastosDateIdx >= 0 ? gastosDateIdx : 0;
-        const d = parseDate(row[idx]);
+        const d = parseDate(row[gastosDateIdxRes] ?? row[0]);
         if (d) {
           if (dateFrom && d < dateFrom) return false;
           if (dateTo && d > dateTo) return false;
         }
       }
-      if (filterCampanha && gastosCampanhaIdx >= 0) {
-        const val = String(row[gastosCampanhaIdx] ?? '').trim();
+      if (filterCampanha && gastosCampanhaIdxRes >= 0) {
+        const val = String(row[gastosCampanhaIdxRes] ?? '').trim();
         if (val !== filterCampanha) return false;
       }
-      if (filterConjunto && gastosConjuntoIdx >= 0) {
-        const val = String(row[gastosConjuntoIdx] ?? '').trim();
+      if (filterConjunto && gastosConjuntoIdxRes >= 0) {
+        const val = String(row[gastosConjuntoIdxRes] ?? '').trim();
         if (val !== filterConjunto) return false;
       }
-      if (filterAnuncio && gastosAnuncioIdx >= 0) {
-        const val = String(row[gastosAnuncioIdx] ?? '').trim();
+      if (filterAnuncio && gastosAnuncioIdxRes >= 0) {
+        const val = String(row[gastosAnuncioIdxRes] ?? '').trim();
         if (val !== filterAnuncio) return false;
       }
       return true;
     };
-
-    const pagina1DateIdx = findColumnIndex(pagina1Headers, 'data', 'date', 'Data', 'DATA', 'dia');
-    const pagina1CampanhaIdx = findColumnIndex(pagina1Headers, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
-    const pagina1ConjuntoIdx = findColumnIndex(pagina1Headers, 'utm_content', 'adset', 'conjunto', 'Ad Set');
-    const pagina1AnuncioIdx = findColumnIndex(pagina1Headers, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
 
     const filterPagina1Row = (row: string[]): boolean => {
       if (dateFrom || dateTo) {
-        const idx = pagina1DateIdx >= 0 ? pagina1DateIdx : 0;
-        const d = parseDate(row[idx]);
+        const d = parseDate(row[pagina1DateIdxRes] ?? row[0]);
         if (d) {
           if (dateFrom && d < dateFrom) return false;
           if (dateTo && d > dateTo) return false;
         }
       }
-      if (filterCampanha && pagina1CampanhaIdx >= 0) {
-        const val = String(row[pagina1CampanhaIdx] ?? '').trim();
+      if (filterCampanha && pagina1CampanhaIdxRes >= 0) {
+        const val = String(row[pagina1CampanhaIdxRes] ?? '').trim();
         if (val !== filterCampanha) return false;
       }
-      if (filterConjunto && pagina1ConjuntoIdx >= 0) {
-        const val = String(row[pagina1ConjuntoIdx] ?? '').trim();
+      if (filterConjunto && pagina1ConjuntoIdxRes >= 0) {
+        const val = String(row[pagina1ConjuntoIdxRes] ?? '').trim();
         if (val !== filterConjunto) return false;
       }
-      if (filterAnuncio && pagina1AnuncioIdx >= 0) {
-        const val = String(row[pagina1AnuncioIdx] ?? '').trim();
+      if (filterAnuncio && pagina1AnuncioIdxRes >= 0) {
+        const val = String(row[pagina1AnuncioIdxRes] ?? '').trim();
         if (val !== filterAnuncio) return false;
       }
       return true;
     };
 
-    const leadsAutomacaoDateIdx = findColumnIndex(leadsAutomacaoHeaders, 'data', 'date', 'Data', 'DATA', 'dia');
-    const leadsAutomacaoCampanhaIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
-    const leadsAutomacaoConjuntoIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_content', 'adset', 'conjunto', 'Ad Set');
-    const leadsAutomacaoAnuncioIdx = findColumnIndex(leadsAutomacaoHeaders, 'utm_term', 'ad_name', 'anúncio', 'Ad Name');
-
     const filterLeadsAutomacaoRow = (row: string[]): boolean => {
       if (dateFrom || dateTo) {
-        const idx = leadsAutomacaoDateIdx >= 0 ? leadsAutomacaoDateIdx : 0;
-        const d = parseDate(row[idx]);
+        const d = parseDate(row[leadsAutomacaoDateIdxRes] ?? row[0]);
         if (d) {
           if (dateFrom && d < dateFrom) return false;
           if (dateTo && d > dateTo) return false;
         }
       }
-      if (filterCampanha && leadsAutomacaoCampanhaIdx >= 0) {
-        const val = String(row[leadsAutomacaoCampanhaIdx] ?? '').trim();
+      if (filterCampanha && leadsAutomacaoCampanhaIdxRes >= 0) {
+        const val = String(row[leadsAutomacaoCampanhaIdxRes] ?? '').trim();
         if (val !== filterCampanha) return false;
       }
-      if (filterConjunto && leadsAutomacaoConjuntoIdx >= 0) {
-        const val = String(row[leadsAutomacaoConjuntoIdx] ?? '').trim();
+      if (filterConjunto && leadsAutomacaoConjuntoIdxRes >= 0) {
+        const val = String(row[leadsAutomacaoConjuntoIdxRes] ?? '').trim();
         if (val !== filterConjunto) return false;
       }
-      if (filterAnuncio && leadsAutomacaoAnuncioIdx >= 0) {
-        const val = String(row[leadsAutomacaoAnuncioIdx] ?? '').trim();
+      if (filterAnuncio && leadsAutomacaoAnuncioIdxRes >= 0) {
+        const val = String(row[leadsAutomacaoAnuncioIdxRes] ?? '').trim();
         if (val !== filterAnuncio) return false;
       }
       return true;
@@ -427,6 +667,356 @@ export default function DashboardPage() {
     const filteredZaiaCount = filteredLeadsAutomacao.filter(
       (row) => String(row[6] || '').toLowerCase() === 'true'
     ).length;
+
+    const funnelSnapshot = {
+      leads: filteredLeadsCount,
+      automacao: filteredLeadsAutomacaoCount,
+      vendas: filteredPurchasedCount,
+    };
+
+    const dailyMap = new Map<
+      string,
+      { key: string; date: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number }
+    >();
+    const weeklyMap = new Map<
+      string,
+      { key: string; startDate: Date; endDate: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number }
+    >();
+    const ensureDailyEntry = (key: string, date: Date) => {
+      let entry = dailyMap.get(key);
+      if (!entry) {
+        entry = { key, date, label: formatDayMonth(date), leads: 0, automacao: 0, vendas: 0, gasto: 0 };
+        dailyMap.set(key, entry);
+      }
+      return entry;
+    };
+    const ensureWeeklyEntry = (key: string, startDate: Date) => {
+      let entry = weeklyMap.get(key);
+      if (!entry) {
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
+        entry = {
+          key,
+          startDate,
+          endDate,
+          label: `${formatDayMonth(startDate)} - ${formatDayMonth(endDate)}`,
+          leads: 0,
+          automacao: 0,
+          vendas: 0,
+          gasto: 0,
+        };
+        weeklyMap.set(key, entry);
+      }
+      return entry;
+    };
+
+    const addToAccumulator = (map: Map<string, number>, key: string, value: number) => {
+      if (!key) return;
+      map.set(key, (map.get(key) ?? 0) + value);
+    };
+
+    const originMetrics = new Map<string, { label: string; leads: number; automacao: number; vendas: number; gasto: number }>();
+    const deviceMetrics = new Map<string, { label: string; leads: number; automacao: number; vendas: number }>();
+    const ensureOriginEntry = (label: string) => {
+      const key = label || 'Indefinido';
+      let entry = originMetrics.get(key);
+      if (!entry) {
+        entry = { label: key, leads: 0, automacao: 0, vendas: 0, gasto: 0 };
+        originMetrics.set(key, entry);
+      }
+      return entry;
+    };
+    const ensureDeviceEntry = (label: string) => {
+      const key = label || 'Indefinido';
+      let entry = deviceMetrics.get(key);
+      if (!entry) {
+        entry = { label: key, leads: 0, automacao: 0, vendas: 0 };
+        deviceMetrics.set(key, entry);
+      }
+      return entry;
+    };
+
+    const leadsPorCampanha = new Map<string, number>();
+    const leadsPorConjunto = new Map<string, number>();
+    const leadsPorAnuncio = new Map<string, number>();
+    const gastosPorCampanha = new Map<string, number>();
+    const gastosPorConjunto = new Map<string, number>();
+    const gastosPorAnuncio = new Map<string, number>();
+    const vendasPorCampanhaMap = new Map<string, number>();
+    const vendasPorConjuntoMap = new Map<string, number>();
+    const vendasPorAnuncioMap = new Map<string, number>();
+    const receitaPorCampanha = new Map<string, number>();
+    const receitaLiquidaPorCampanha = new Map<string, number>();
+    const receitaPorConjunto = new Map<string, number>();
+    const receitaPorAnuncio = new Map<string, number>();
+
+    const leadMeta = new Map<
+      string,
+      { firstSeen: Date; source?: string; device?: string; campanha?: string; conjunto?: string; anuncio?: string }
+    >();
+    const registerLeadMeta = (
+      identifiers: string[],
+      info: { date: Date; source?: string; device?: string; campanha?: string; conjunto?: string; anuncio?: string }
+    ) => {
+      identifiers.forEach((identifier) => {
+        if (!identifier) return;
+        const existing = leadMeta.get(identifier);
+        if (!existing || info.date < existing.firstSeen) {
+          leadMeta.set(identifier, { firstSeen: info.date, ...info });
+        } else {
+          const merged = { ...existing };
+          if (info.source && !merged.source) merged.source = info.source;
+          if (info.device && !merged.device) merged.device = info.device;
+          if (info.campanha && !merged.campanha) merged.campanha = info.campanha;
+          if (info.conjunto && !merged.conjunto) merged.conjunto = info.conjunto;
+          if (info.anuncio && !merged.anuncio) merged.anuncio = info.anuncio;
+          leadMeta.set(identifier, merged);
+        }
+      });
+    };
+
+    filteredPagina1.forEach((row) => {
+      const date = parseDate(pagina1DateIdxRes >= 0 ? row[pagina1DateIdxRes] : row[0]);
+      if (!date) return;
+      const diario = ensureDailyEntry(toDateKey(date), date);
+      diario.leads += 1;
+      const semanal = ensureWeeklyEntry(toWeekKey(date), getWeekStart(date));
+      semanal.leads += 1;
+
+      const source = pagina1SourceIdxRes >= 0 ? normalizeLabel(row[pagina1SourceIdxRes], 'Sem origem') : 'Sem origem';
+      const device = pagina1DeviceIdxRes >= 0 ? normalizeLabel(row[pagina1DeviceIdxRes], 'Sem dispositivo') : 'Sem dispositivo';
+      ensureOriginEntry(source).leads += 1;
+      ensureDeviceEntry(device).leads += 1;
+
+      const campanha = pagina1CampanhaIdxRes >= 0 ? normalizeLabel(row[pagina1CampanhaIdxRes], '') : '';
+      const conjunto = pagina1ConjuntoIdxRes >= 0 ? normalizeLabel(row[pagina1ConjuntoIdxRes], '') : '';
+      const anuncio = pagina1AnuncioIdxRes >= 0 ? normalizeLabel(row[pagina1AnuncioIdxRes], '') : '';
+
+      if (campanha) addToAccumulator(leadsPorCampanha, campanha, 1);
+      if (conjunto) addToAccumulator(leadsPorConjunto, conjunto, 1);
+      if (anuncio) addToAccumulator(leadsPorAnuncio, anuncio, 1);
+
+      const identifiers = extractIdentifiers(row, {
+        emailIdx: pagina1EmailIdxRes,
+        phoneIdx: pagina1TelefoneIdxRes,
+        leadIdIdx: pagina1LeadIdIdxRes,
+      });
+      if (identifiers.length) {
+        registerLeadMeta(identifiers, { date, source, device, campanha, conjunto, anuncio });
+      }
+    });
+
+    filteredLeadsAutomacao.forEach((row) => {
+      const date = parseDate(leadsAutomacaoDateIdxRes >= 0 ? row[leadsAutomacaoDateIdxRes] : row[0]);
+      if (date) {
+        ensureDailyEntry(toDateKey(date), date).automacao += 1;
+        ensureWeeklyEntry(toWeekKey(date), getWeekStart(date)).automacao += 1;
+      }
+      const source =
+        leadsAutomacaoSourceIdxRes >= 0 ? normalizeLabel(row[leadsAutomacaoSourceIdxRes], 'Sem origem') : undefined;
+      const device =
+        leadsAutomacaoDeviceIdxRes >= 0 ? normalizeLabel(row[leadsAutomacaoDeviceIdxRes], 'Sem dispositivo') : undefined;
+      if (source) ensureOriginEntry(source).automacao += 1;
+      if (device) ensureDeviceEntry(device).automacao += 1;
+
+      const identifiers = extractIdentifiers(row, {
+        emailIdx: leadsAutomacaoEmailIdxRes,
+        phoneIdx: leadsAutomacaoTelefoneIdxRes,
+        leadIdIdx: leadsAutomacaoLeadIdIdxRes,
+      });
+      if (identifiers.length) {
+        const dateInfo = date ?? new Date();
+        registerLeadMeta(identifiers, { date: dateInfo, source, device });
+      }
+    });
+
+    filteredGastos.forEach((row) => {
+      const date = parseDate(gastosDateIdxRes >= 0 ? row[gastosDateIdxRes] : row[0]);
+      const amount = gastosAmountIdxRes >= 0 ? parseMoney(row[gastosAmountIdxRes]) : 0;
+      if (date) {
+        ensureDailyEntry(toDateKey(date), date).gasto += amount;
+        ensureWeeklyEntry(toWeekKey(date), getWeekStart(date)).gasto += amount;
+      }
+      const campanha = gastosCampanhaIdxRes >= 0 ? normalizeLabel(row[gastosCampanhaIdxRes], '') : '';
+      const conjunto = gastosConjuntoIdxRes >= 0 ? normalizeLabel(row[gastosConjuntoIdxRes], '') : '';
+      const anuncio = gastosAnuncioIdxRes >= 0 ? normalizeLabel(row[gastosAnuncioIdxRes], '') : '';
+      const origem = gastosCanalIdxRes >= 0 ? normalizeLabel(row[gastosCanalIdxRes], 'Sem origem') : null;
+      const device = gastosDeviceIdxRes >= 0 ? normalizeLabel(row[gastosDeviceIdxRes], 'Sem dispositivo') : null;
+
+      if (campanha) addToAccumulator(gastosPorCampanha, campanha, amount);
+      if (conjunto) addToAccumulator(gastosPorConjunto, conjunto, amount);
+      if (anuncio) addToAccumulator(gastosPorAnuncio, anuncio, amount);
+      if (origem) ensureOriginEntry(origem).gasto += amount;
+      if (device) ensureDeviceEntry(device).leads += 0; // garante presença
+    });
+
+    const conversionDiffs: number[] = [];
+    filteredVendas.forEach((row) => {
+      const date = parseDate(vendasDateIdxRes >= 0 ? row[vendasDateIdxRes] : row[0]);
+      if (date) {
+        ensureDailyEntry(toDateKey(date), date).vendas += 1;
+        ensureWeeklyEntry(toWeekKey(date), getWeekStart(date)).vendas += 1;
+      }
+
+      let campanha = vendasCampanhaIdxRes >= 0 ? normalizeLabel(row[vendasCampanhaIdxRes], '') : '';
+      let conjunto = vendasConjuntoIdxRes >= 0 ? normalizeLabel(row[vendasConjuntoIdxRes], '') : '';
+      let anuncio = vendasAnuncioIdxRes >= 0 ? normalizeLabel(row[vendasAnuncioIdxRes], '') : '';
+      const origemVenda = vendasSourceIdxRes >= 0 ? normalizeLabel(row[vendasSourceIdxRes], 'Sem origem') : undefined;
+      const deviceVenda = vendasMediumIdxRes >= 0 ? normalizeLabel(row[vendasMediumIdxRes], '') : undefined;
+      const valorBruto = parseMoney(vendasValorBrutoIdxRes >= 0 ? row[vendasValorBrutoIdxRes] : row[5]);
+      const valorLiquido = parseMoney(vendasValorLiquidoIdxRes >= 0 ? row[vendasValorLiquidoIdxRes] : row[6]);
+
+      const identifiers = extractIdentifiers(row, {
+        emailIdx: vendasEmailIdxRes,
+        phoneIdx: vendasTelefoneIdxRes,
+        leadIdIdx: vendasLeadIdIdxRes,
+      });
+
+      let attributed = false;
+      if (identifiers.length) {
+        for (const identifier of identifiers) {
+          const meta = leadMeta.get(identifier);
+          if (!meta || !date) continue;
+          attributed = true;
+          if (!campanha && meta.campanha) campanha = meta.campanha;
+          if (!conjunto && meta.conjunto) conjunto = meta.conjunto;
+          if (!anuncio && meta.anuncio) anuncio = meta.anuncio;
+          const diffMs = date.getTime() - meta.firstSeen.getTime();
+          if (diffMs >= 0) {
+            conversionDiffs.push(diffMs / (1000 * 60 * 60 * 24));
+          }
+          const originLabel = meta.source || origemVenda || 'Sem origem';
+          ensureOriginEntry(originLabel).vendas += 1;
+          const deviceLabel = meta.device || deviceVenda || 'Sem dispositivo';
+          ensureDeviceEntry(deviceLabel).vendas += 1;
+          break;
+        }
+      }
+
+      if (!attributed) {
+        if (origemVenda) ensureOriginEntry(origemVenda).vendas += 1;
+        if (deviceVenda) ensureDeviceEntry(deviceVenda).vendas += 1;
+      }
+
+      const campanhaFinal = campanha || 'Sem campanha';
+      const conjuntoFinal = conjunto || 'Sem conjunto';
+      const anuncioFinal = anuncio || 'Sem anúncio';
+      addToAccumulator(vendasPorCampanhaMap, campanhaFinal, 1);
+      addToAccumulator(vendasPorConjuntoMap, conjuntoFinal, 1);
+      addToAccumulator(vendasPorAnuncioMap, anuncioFinal, 1);
+      addToAccumulator(receitaPorCampanha, campanhaFinal, valorBruto);
+      addToAccumulator(receitaLiquidaPorCampanha, campanhaFinal, valorLiquido);
+      addToAccumulator(receitaPorConjunto, conjuntoFinal, valorBruto);
+      addToAccumulator(receitaPorAnuncio, anuncioFinal, valorBruto);
+    });
+
+    const tempoMedioConversaoDias = conversionDiffs.length
+      ? conversionDiffs.reduce((acc, curr) => acc + curr, 0) / conversionDiffs.length
+      : null;
+    const tempoMedioConversaoHoras = tempoMedioConversaoDias !== null ? tempoMedioConversaoDias * 24 : null;
+
+    const timelineDaily = Array.from(dailyMap.values())
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map((entry) => ({
+        key: entry.key,
+        label: entry.label,
+        leads: entry.leads,
+        automacao: entry.automacao,
+        vendas: entry.vendas,
+        gasto: Number(entry.gasto.toFixed(2)),
+      }));
+
+    const timelineWeekly = Array.from(weeklyMap.values())
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+      .map((entry) => ({
+        key: entry.key,
+        label: entry.label,
+        leads: entry.leads,
+        automacao: entry.automacao,
+        vendas: entry.vendas,
+        gasto: Number(entry.gasto.toFixed(2)),
+      }));
+
+    const segmentacaoOrigem = Array.from(originMetrics.values()).map((entry) => ({
+      ...entry,
+      gasto: Number(entry.gasto.toFixed(2)),
+    }));
+    const segmentacaoDispositivo = Array.from(deviceMetrics.values());
+
+    const performanceCampanhas = Array.from(
+      new Set([
+        ...Array.from(leadsPorCampanha.keys()),
+        ...Array.from(vendasPorCampanhaMap.keys()),
+        ...Array.from(gastosPorCampanha.keys()),
+        ...Array.from(receitaPorCampanha.keys()),
+      ])
+    ).map((nome) => {
+      const leads = leadsPorCampanha.get(nome) ?? 0;
+      const vendas = vendasPorCampanhaMap.get(nome) ?? 0;
+      const gasto = gastosPorCampanha.get(nome) ?? 0;
+      const receita = receitaPorCampanha.get(nome) ?? 0;
+      const roiCampanha = gasto > 0 ? ((receita - gasto) / gasto) * 100 : null;
+      return {
+        nome: nome || 'Indefinido',
+        leads,
+        vendas,
+        gasto,
+        receita,
+        roi: roiCampanha,
+        cpl: leads > 0 ? gasto / leads : null,
+        cpa: vendas > 0 ? gasto / vendas : null,
+      };
+    });
+
+    const performanceConjuntos = Array.from(
+      new Set([
+        ...Array.from(leadsPorConjunto.keys()),
+        ...Array.from(vendasPorConjuntoMap.keys()),
+        ...Array.from(gastosPorConjunto.keys()),
+        ...Array.from(receitaPorConjunto.keys()),
+      ])
+    ).map((nome) => {
+      const leads = leadsPorConjunto.get(nome) ?? 0;
+      const vendas = vendasPorConjuntoMap.get(nome) ?? 0;
+      const gasto = gastosPorConjunto.get(nome) ?? 0;
+      const receita = receitaPorConjunto.get(nome) ?? 0;
+      const roiConjunto = gasto > 0 ? ((receita - gasto) / gasto) * 100 : null;
+      return {
+        nome: nome || 'Indefinido',
+        leads,
+        vendas,
+        gasto,
+        receita,
+        roi: roiConjunto,
+        cpl: leads > 0 ? gasto / leads : null,
+        cpa: vendas > 0 ? gasto / vendas : null,
+      };
+    });
+
+    const performanceAnuncios = Array.from(
+      new Set([
+        ...Array.from(leadsPorAnuncio.keys()),
+        ...Array.from(vendasPorAnuncioMap.keys()),
+        ...Array.from(gastosPorAnuncio.keys()),
+        ...Array.from(receitaPorAnuncio.keys()),
+      ])
+    ).map((nome) => {
+      const leads = leadsPorAnuncio.get(nome) ?? 0;
+      const vendas = vendasPorAnuncioMap.get(nome) ?? 0;
+      const gasto = gastosPorAnuncio.get(nome) ?? 0;
+      const receita = receitaPorAnuncio.get(nome) ?? 0;
+      const roiAnuncio = gasto > 0 ? ((receita - gasto) / gasto) * 100 : null;
+      return {
+        nome: nome || 'Indefinido',
+        leads,
+        vendas,
+        gasto,
+        receita,
+        roi: roiAnuncio,
+        cpl: leads > 0 ? gasto / leads : null,
+        cpa: vendas > 0 ? gasto / vendas : null,
+      };
+    });
 
     // Funil do quiz (baseado na aba Página1)
     const quizSteps = [
@@ -450,61 +1040,112 @@ export default function DashboardPage() {
     }));
 
     const totalVendasValue = filteredVendas.reduce((acc, row) => {
-      const raw = String(row[5] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
-      const num = parseFloat(raw);
-      return acc + (Number.isNaN(num) ? 0 : num);
+      const value = vendasValorBrutoIdxRes >= 0 ? row[vendasValorBrutoIdxRes] : row[5];
+      return acc + parseMoney(value);
     }, 0);
     const totalVendasLiquido = filteredVendas.reduce((acc, row) => {
-      const raw = String(row[6] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
-      const num = parseFloat(raw);
-      return acc + (Number.isNaN(num) ? 0 : num);
+      const value = vendasValorLiquidoIdxRes >= 0 ? row[vendasValorLiquidoIdxRes] : row[6];
+      return acc + parseMoney(value);
     }, 0);
     const vendasPorCheckout = filteredVendas.reduce((acc, row) => {
-      const checkout = String(row[2] || '').toUpperCase();
-      if (checkout === 'HUBLA' || checkout === 'CAKTO') acc[checkout] = (acc[checkout] || 0) + 1;
+      const checkout = String((vendasCheckoutIdxRes >= 0 ? row[vendasCheckoutIdxRes] : row[2]) || '').toUpperCase();
+      if (checkout === 'HUBLA') acc[checkout] = (acc[checkout] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const PLANO_INV = /^plano(\s*1)?$/i;
     const vendasPorPlano = filteredVendas.reduce((acc, row) => {
-      const plano = String(row[4] || '').trim();
+      const plano = String((vendasPlanoIdxRes >= 0 ? row[vendasPlanoIdxRes] : row[4]) || '').trim();
       if (plano && !PLANO_INV.test(plano)) acc[plano] = (acc[plano] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const vendasPorPlanoExibir = Object.entries(vendasPorPlano).filter(([p]) => !PLANO_INV.test(String(p).trim()));
-    const vendasPorCampanha = filteredVendas.reduce((acc, row) => {
-      const campanha = String(row[vendasCampanhaIdxRes] ?? '').trim();
-      if (campanha) acc[campanha] = (acc[campanha] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const indiceForma = findColumnIndex(vendasHeaders, 'forma de pagamento', 'forma pagamento', 'payment');
-    const indiceFormaRes = indiceForma >= 0 ? indiceForma : 7;
+    const vendasPorCampanha = Object.fromEntries(
+      Array.from(vendasPorCampanhaMap.entries()).filter(([nome]) => !!nome)
+    );
     const vendasPorFormaPagamento = filteredVendas.reduce((acc, row) => {
-      const raw = String(row[indiceFormaRes] ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const raw = String(
+        (vendasFormaPagamentoIdxRes >= 0 ? row[vendasFormaPagamentoIdxRes] : row[7]) ?? ''
+      )
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
       if (raw.includes('pix')) acc.pix += 1;
       else if (raw.includes('credito') || raw.includes('credit') || (raw.includes('cartao') && !raw.includes('debito'))) acc.cartaoCredito += 1;
       return acc;
     }, { pix: 0, cartaoCredito: 0 });
 
-    const amountSpentIdx = gastosHeaders.findIndex((h) => normalizeHeader(h) === 'amount spent' || normalizeHeader(h).includes('amount'));
-    const amountSpentTotal = amountSpentIdx >= 0 ? filteredGastos.reduce((acc, row) => {
-      const raw = String(row[amountSpentIdx] || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
-      const num = parseFloat(raw);
-      return acc + (Number.isNaN(num) ? 0 : num);
+    const amountSpentTotal = gastosAmountIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      const value = row[gastosAmountIdxRes];
+      return acc + parseMoney(value);
     }, 0) : 0;
 
     const roi = amountSpentTotal > 0
       ? ((totalVendasValue - amountSpentTotal) / amountSpentTotal) * 100
       : null;
 
+    const cpl = filteredLeadsCount > 0 ? amountSpentTotal / filteredLeadsCount : null;
+    const cpa = filteredPurchasedCount > 0 ? amountSpentTotal / filteredPurchasedCount : null;
+    const ticketMedioBruto = filteredPurchasedCount > 0 ? totalVendasValue / filteredPurchasedCount : null;
+    const ticketMedioLiquido = filteredPurchasedCount > 0 ? totalVendasLiquido / filteredPurchasedCount : null;
+    const leadToAutomationRate = filteredLeadsCount > 0 ? (filteredLeadsAutomacaoCount / filteredLeadsCount) * 100 : null;
+    const automationToSaleRate =
+      filteredLeadsAutomacaoCount > 0 ? (filteredPurchasedCount / filteredLeadsAutomacaoCount) * 100 : null;
+    const leadToSaleRate = filteredLeadsCount > 0 ? (filteredPurchasedCount / filteredLeadsCount) * 100 : null;
+
+    const automationMetrics = {
+      leadToAutomationRate,
+      automationToSaleRate,
+      leadToSaleRate,
+      tempoMedioConversaoDias,
+      tempoMedioConversaoHoras,
+      processedRate: leadToAutomationRate,
+      zaiaParticipation:
+        filteredLeadsAutomacaoCount > 0 ? (filteredZaiaCount / filteredLeadsAutomacaoCount) * 100 : null,
+    };
+
+    const alerts: Array<{ tipo: 'info' | 'warning' | 'danger'; mensagem: string }> = [];
+    if (roi !== null && roi < 0) {
+      alerts.push({ tipo: 'danger', mensagem: 'ROI negativo no período selecionado.' });
+    }
+    if (leadToAutomationRate !== null && leadToAutomationRate < 40) {
+      alerts.push({ tipo: 'warning', mensagem: 'Menos de 40% dos leads estão avançando para automação.' });
+    }
+    if (automationToSaleRate !== null && automationToSaleRate < 5) {
+      alerts.push({ tipo: 'warning', mensagem: 'Conversão de automação para vendas abaixo de 5%.' });
+    }
+    if (timelineDaily.length >= 2) {
+      const last = timelineDaily[timelineDaily.length - 1];
+      const prev = timelineDaily[timelineDaily.length - 2];
+      if (prev.leads > 0) {
+        const drop = ((prev.leads - last.leads) / prev.leads) * 100;
+        if (drop >= 30) {
+          alerts.push({
+            tipo: 'warning',
+            mensagem: `Queda de ${drop.toFixed(1)}% no volume de leads vs. dia anterior.`,
+          });
+        }
+      }
+    }
+
+    const funnelResumo = {
+      ...funnelSnapshot,
+      leadToAutomationRate,
+      automationToSaleRate,
+      leadToSaleRate,
+      tempoMedioConversaoDias,
+      tempoMedioConversaoHoras,
+    };
+
     const allCampanhas = new Set<string>();
     vendasRows.forEach((r) => { const v = vendasCampanhaIdxRes >= 0 ? String(r[vendasCampanhaIdxRes] ?? '').trim() : ''; if (v) allCampanhas.add(v); });
     gastosRows.forEach((r) => { const v = gastosCampanhaIdx >= 0 ? String(r[gastosCampanhaIdx] ?? '').trim() : ''; if (v) allCampanhas.add(v); });
     const allConjuntos = new Set<string>();
-    vendasRows.forEach((r) => { if (vendasConjuntoIdx >= 0) { const v = String(r[vendasConjuntoIdx] ?? '').trim(); if (v) allConjuntos.add(v); } });
-    gastosRows.forEach((r) => { if (gastosConjuntoIdx >= 0) { const v = String(r[gastosConjuntoIdx] ?? '').trim(); if (v) allConjuntos.add(v); } });
+    vendasRows.forEach((r) => { if (vendasConjuntoIdxRes >= 0) { const v = String(r[vendasConjuntoIdxRes] ?? '').trim(); if (v) allConjuntos.add(v); } });
+    gastosRows.forEach((r) => { if (gastosConjuntoIdxRes >= 0) { const v = String(r[gastosConjuntoIdxRes] ?? '').trim(); if (v) allConjuntos.add(v); } });
     const allAnuncios = new Set<string>();
-    vendasRows.forEach((r) => { if (vendasAnuncioIdx >= 0) { const v = String(r[vendasAnuncioIdx] ?? '').trim(); if (v) allAnuncios.add(v); } });
-    gastosRows.forEach((r) => { if (gastosAnuncioIdx >= 0) { const v = String(r[gastosAnuncioIdx] ?? '').trim(); if (v) allAnuncios.add(v); } });
+    vendasRows.forEach((r) => { if (vendasAnuncioIdxRes >= 0) { const v = String(r[vendasAnuncioIdxRes] ?? '').trim(); if (v) allAnuncios.add(v); } });
+    gastosRows.forEach((r) => { if (gastosAnuncioIdxRes >= 0) { const v = String(r[gastosAnuncioIdxRes] ?? '').trim(); if (v) allAnuncios.add(v); } });
 
     return {
       filteredVendas,
@@ -516,11 +1157,25 @@ export default function DashboardPage() {
       vendasPorFormaPagamento,
       amountSpentTotal,
       roi,
+      funnelResumo,
       filteredLeadsCount,
       filteredPurchasedCount,
       filteredZaiaCount,
       filteredLeadsAutomacaoCount,
       filteredGastosCount: filteredGastos.length,
+      timelineDaily,
+      timelineWeekly,
+      segmentacaoOrigem,
+      segmentacaoDispositivo,
+      performanceCampanhas,
+      performanceConjuntos,
+      performanceAnuncios,
+      cpl,
+      cpa,
+      ticketMedioBruto,
+      ticketMedioLiquido,
+      automationMetrics,
+      alerts,
       quizFunnelData,
       opcoesCampanha: Array.from(allCampanhas).sort(),
       opcoesConjunto: Array.from(allConjuntos).sort(),
@@ -574,6 +1229,7 @@ export default function DashboardPage() {
     vendasPorFormaPagamento,
     amountSpentTotal,
     roi,
+    funnelResumo,
     filteredVendas,
     filteredLeadsCount,
     filteredPurchasedCount,
@@ -584,11 +1240,20 @@ export default function DashboardPage() {
     opcoesCampanha,
     opcoesConjunto,
     opcoesAnuncio,
+    timelineDaily,
+    timelineWeekly,
+    segmentacaoOrigem,
+    segmentacaoDispositivo,
+    performanceCampanhas,
+    performanceConjuntos,
+    performanceAnuncios,
+    cpl,
+    cpa,
+    ticketMedioBruto,
+    ticketMedioLiquido,
+    automationMetrics,
+    alerts,
   } = filteredResumo;
-
-  const conversionRate = filteredLeadsAutomacaoCount > 0
-    ? (filteredPurchasedCount / filteredLeadsAutomacaoCount * 100).toFixed(1)
-    : '0.0';
 
   const melhorAnuncio = (() => {
     const entries = Object.entries(vendasPorCampanha);
@@ -607,6 +1272,117 @@ export default function DashboardPage() {
     setFilterCampanha('');
     setFilterConjunto('');
     setFilterAnuncio('');
+  };
+
+  const formatCurrency = (value: number | null | undefined, digits = 2) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '—';
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  };
+
+  const formatPercent = (value: number | null | undefined, digits = 1) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '—';
+    return `${value.toFixed(digits)}%`;
+  };
+
+  const leadToAutomationRateValue = automationMetrics.leadToAutomationRate ?? null;
+  const automationToSaleRateValue = automationMetrics.automationToSaleRate ?? null;
+  const leadToSaleRateValue = automationMetrics.leadToSaleRate ?? null;
+  const zaiaRateValue = automationMetrics.zaiaParticipation ?? null;
+  const leadToAutomationProgress = Math.min(100, Math.max(0, leadToAutomationRateValue ?? 0));
+  const automationToSaleProgress = Math.min(100, Math.max(0, automationToSaleRateValue ?? 0));
+  const tempoMedioConversaoTexto =
+    automationMetrics.tempoMedioConversaoDias !== null && automationMetrics.tempoMedioConversaoDias !== undefined
+      ? `${automationMetrics.tempoMedioConversaoDias.toFixed(1)} dias`
+      : '—';
+  const tempoMedioConversaoHorasTexto =
+    automationMetrics.tempoMedioConversaoHoras !== null && automationMetrics.tempoMedioConversaoHoras !== undefined
+      ? `${automationMetrics.tempoMedioConversaoHoras.toFixed(1)} h`
+      : '—';
+  const timelineData = timelineView === 'daily' ? timelineDaily : timelineWeekly;
+  const timelineSubtitle = timelineView === 'daily' ? 'Visão diária' : 'Visão semanal';
+  const rankingFilter = <T extends { nome: string; leads: number; vendas: number; gasto: number }>(items: T[]) =>
+    items.filter((item) => (item.nome && item.nome.trim() !== '') || item.vendas > 0 || item.gasto > 0 || item.leads > 0);
+  const topCampanhas = rankingFilter(performanceCampanhas)
+    .sort((a, b) => (b.receita ?? 0) - (a.receita ?? 0))
+    .slice(0, 5);
+  const worstCampanhas = rankingFilter(performanceCampanhas)
+    .filter((item) => item.roi !== null && item.roi !== undefined)
+    .sort((a, b) => (a.roi ?? 0) - (b.roi ?? 0))
+    .slice(0, 5);
+  const topConjuntos = rankingFilter(performanceConjuntos)
+    .sort((a, b) => (b.receita ?? 0) - (a.receita ?? 0))
+    .slice(0, 5);
+  const worstConjuntos = rankingFilter(performanceConjuntos)
+    .filter((item) => item.roi !== null && item.roi !== undefined)
+    .sort((a, b) => (a.roi ?? 0) - (b.roi ?? 0))
+    .slice(0, 5);
+  const topAnuncios = rankingFilter(performanceAnuncios)
+    .sort((a, b) => (b.receita ?? 0) - (a.receita ?? 0))
+    .slice(0, 5);
+  const worstAnuncios = rankingFilter(performanceAnuncios)
+    .filter((item) => item.roi !== null && item.roi !== undefined)
+    .sort((a, b) => (a.roi ?? 0) - (b.roi ?? 0))
+    .slice(0, 5);
+  const rankingConfigs = [
+    {
+      title: 'Campanhas',
+      topLabel: 'Top 5 por receita',
+      bottomLabel: 'Precisam de atenção (ROI)',
+      top: topCampanhas,
+      bottom: worstCampanhas,
+    },
+    {
+      title: 'Conjuntos',
+      topLabel: 'Top 5 por receita',
+      bottomLabel: 'Precisam de atenção (ROI)',
+      top: topConjuntos,
+      bottom: worstConjuntos,
+    },
+    {
+      title: 'Anúncios',
+      topLabel: 'Top 5 por receita',
+      bottomLabel: 'Precisam de atenção (ROI)',
+      top: topAnuncios,
+      bottom: worstAnuncios,
+    },
+  ] as const;
+  const topOrigens = [...segmentacaoOrigem]
+    .sort((a, b) => b.leads - a.leads)
+    .slice(0, 6);
+  const topDevices = [...segmentacaoDispositivo]
+    .sort((a, b) => b.leads - a.leads)
+    .slice(0, 5);
+  const totalDeviceLeads = segmentacaoDispositivo.reduce((acc, item) => acc + item.leads, 0);
+  const alertStyleMap: Record<
+    'danger' | 'warning' | 'info',
+    { bg: string; border: string; iconBg: string; iconColor: string; label: string }
+  > = {
+    danger: {
+      bg: 'bg-red-500/10',
+      border: 'border-red-500/30',
+      iconBg: 'bg-red-500/20',
+      iconColor: 'text-red-300',
+      label: 'Crítico',
+    },
+    warning: {
+      bg: 'bg-amber-500/10',
+      border: 'border-amber-500/30',
+      iconBg: 'bg-amber-500/20',
+      iconColor: 'text-amber-300',
+      label: 'Atenção',
+    },
+    info: {
+      bg: 'bg-sky-500/10',
+      border: 'border-sky-500/30',
+      iconBg: 'bg-sky-500/20',
+      iconColor: 'text-sky-300',
+      label: 'Info',
+    },
   };
 
   return (
@@ -801,74 +1577,291 @@ export default function DashboardPage() {
                   <span className="text-white font-semibold">{filteredVendas.length} vendas</span>
                 </div>
               </div>
+              <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
+                  <div>
+                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Leads captados</p>
+                    <p className="text-white text-xl font-semibold mt-1">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-emerald-100/80 text-xs">Avançam p/ automação</p>
+                    <p className="text-white text-sm font-semibold">{formatPercent(leadToAutomationRateValue)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
+                  <div>
+                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Leads na automação</p>
+                    <p className="text-white text-xl font-semibold mt-1">{filteredLeadsAutomacaoCount.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-emerald-100/80 text-xs">Zaia ativos</p>
+                    <p className="text-white text-sm font-semibold">
+                      {filteredZaiaCount} · {formatPercent(zaiaRateValue)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
+                  <div>
+                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Vendas concluídas</p>
+                    <p className="text-white text-xl font-semibold mt-1">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-emerald-100/80 text-xs">Lead → venda</p>
+                    <p className="text-white text-sm font-semibold">{formatPercent(leadToSaleRateValue)}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Cards principais em grid (inclui ROI) */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-sky-500/30 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
+            {alerts.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {alerts.map((alert, idx) => {
+                  const styles = alertStyleMap[alert.tipo];
+                  return (
+                    <div
+                      key={`${alert.tipo}-${idx}`}
+                      className={`flex items-start gap-3 rounded-2xl ${styles.bg} border ${styles.border} p-4`}
+                    >
+                      <div className={`mt-0.5 h-9 w-9 flex items-center justify-center rounded-xl ${styles.iconBg}`}>
+                        <IconMegaphone className={`w-5 h-5 ${styles.iconColor}`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                            {styles.label}
+                          </span>
+                          <span className="text-[10px] uppercase text-slate-500">Dashboard</span>
+                        </div>
+                        <p className="text-slate-200 text-sm mt-1">{alert.mensagem}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Cards principais em grid (inclui ROI, CPL, Ticket) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-sky-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
                     <IconUsers className="w-5 h-5 text-sky-400" />
                   </div>
+                  <span className="text-slate-500 text-xs">Topo do funil</span>
                 </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsCount}</p>
-                <div className="mt-2 h-1 bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-sky-500 rounded-full" style={{ width: '100%' }} />
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads captados</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+                  <span className="text-slate-400">→ automação</span>
+                  <span className="text-sky-300 font-semibold">{formatPercent(leadToAutomationRateValue)}</span>
                 </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-green-500/30 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                    <IconCheck className="w-5 h-5 text-green-400" />
-                  </div>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredPurchasedCount}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-green-400 text-sm font-semibold">{conversionRate}%</span>
-                  <span className="text-slate-500 text-xs">taxa</span>
+                <div className="mt-2 h-2 bg-slate-900/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400"
+                    style={{ width: `${leadToAutomationProgress}%` }}
+                  />
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                    <IconTrending className="w-5 h-5 text-amber-400" />
-                  </div>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Investido</p>
-                <p className="text-white text-2xl font-bold mt-1">
-                  {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-                </p>
-                <p className="text-slate-500 text-xs mt-2">{filteredGastosCount} campanhas</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-purple-500/30 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-purple-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
                     <IconCog className="w-5 h-5 text-purple-400" />
                   </div>
+                  <span className="text-slate-500 text-xs">Fluxo ativo</span>
                 </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Automação</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredZaiaCount}</p>
-                <p className="text-slate-500 text-xs mt-2">enviados Zaia</p>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads na automação</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsAutomacaoCount.toLocaleString('pt-BR')}</p>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+                  <span className="text-slate-400">Zaia enviados</span>
+                  <span className="text-purple-300 font-semibold">{filteredZaiaCount.toLocaleString('pt-BR')}</span>
+                </div>
+                <p className="text-slate-500 text-[11px] mt-2">Participação Zaia: {formatPercent(zaiaRateValue)}</p>
               </div>
 
-              <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl border border-slate-700/50 p-5 hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-emerald-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <IconCheck className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <span className="text-slate-500 text-xs">Resultado</span>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
+                <p className="text-white text-2xl font-bold mt-1">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+                  <span className="text-slate-400">Automação → venda</span>
+                  <span className="text-emerald-300 font-semibold">{formatPercent(automationToSaleRateValue)}</span>
+                </div>
+                <div className="mt-2 h-2 bg-slate-900/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300"
+                    style={{ width: `${automationToSaleProgress}%` }}
+                  />
+                </div>
+                <p className="text-slate-500 text-[11px] mt-2">Lead → venda: {formatPercent(leadToSaleRateValue)}</p>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-amber-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                     <IconTrending className="w-5 h-5 text-amber-400" />
                   </div>
+                  <span className="text-slate-500 text-xs">{filteredGastosCount} linhas</span>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Investimento</p>
+                <p className="text-white text-2xl font-bold mt-1">{formatCurrency(amountSpentTotal, 0)}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/60 px-2 py-1 text-slate-300">
+                    CPL {formatCurrency(cpl)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/60 px-2 py-1 text-slate-300">
+                    CPA {formatCurrency(cpa)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-sky-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                    <IconCurrency className="w-5 h-5 text-sky-400" />
+                  </div>
+                  <span className="text-slate-500 text-xs">Valor médio</span>
+                </div>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Ticket médio</p>
+                <p className="text-white text-2xl font-bold mt-1">{formatCurrency(ticketMedioBruto)}</p>
+                <p className="text-slate-500 text-xs mt-2">Líquido: <span className="text-slate-300 font-semibold">{formatCurrency(ticketMedioLiquido)}</span></p>
+              </div>
+
+              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-emerald-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <IconTrending className="w-5 h-5 text-emerald-400 rotate-90" />
+                  </div>
+                  <span className="text-slate-500 text-xs">Saúde do funil</span>
                 </div>
                 <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">ROI</p>
                 <p className="text-white text-2xl font-bold mt-1">
                   {roi !== null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
                 </p>
-                <p className="text-slate-500 text-xs mt-2">
-                  Investido: {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-                </p>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+                  <span className="text-slate-400">Tempo médio</span>
+                  <span className="text-emerald-300 font-semibold">{tempoMedioConversaoTexto}</span>
+                </div>
+                <p className="text-slate-500 text-[11px] mt-2">≈ {tempoMedioConversaoHorasTexto}</p>
+              </div>
+            </div>
+
+            {/* Linha do tempo */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/60 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                <div>
+                  <h3 className="text-white font-semibold">Linha do tempo de performance</h3>
+                  <p className="text-slate-500 text-sm">{timelineSubtitle}</p>
+                </div>
+                <div className="inline-flex items-center bg-slate-700/50 rounded-full p-1 border border-slate-600/70">
+                  <button
+                    type="button"
+                    onClick={() => setTimelineView('daily')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      timelineView === 'daily'
+                        ? 'bg-sky-500/80 text-white shadow-md'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Diário
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineView('weekly')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      timelineView === 'weekly'
+                        ? 'bg-sky-500/80 text-white shadow-md'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    Semanal
+                  </button>
+                </div>
+              </div>
+              <div className="h-72">
+                {timelineData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={timelineData}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis
+                        yAxisId="left"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) =>
+                          Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+                        }
+                      />
+                      <Tooltip content={<TimelineTooltip />} />
+                      <Legend
+                        wrapperStyle={{ paddingTop: 10 }}
+                        formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                      />
+                      <Area
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="gasto"
+                        name="Investido"
+                        stroke="rgb(245 158 11)"
+                        fill="rgba(245, 158, 11, 0.25)"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="leads"
+                        name="Leads"
+                        stroke="rgb(56 189 248)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="automacao"
+                        name="Automação"
+                        stroke="rgb(168 85 247)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="vendas"
+                        name="Vendas"
+                        stroke="rgb(16 185 129)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                    Sem dados suficientes para exibir.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -962,6 +1955,78 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Rankings de performance */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {rankingConfigs.map((config) => (
+                <div key={config.title} className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold">Ranking de {config.title}</h3>
+                    <span className="text-slate-500 text-xs">Valores filtrados</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-emerald-300 text-xs font-semibold uppercase tracking-wide">
+                        {config.topLabel}
+                      </p>
+                      <div className="mt-2 space-y-3">
+                        {config.top.length > 0 ? config.top.map((item, idx) => (
+                          <div
+                            key={`${config.title}-top-${item.nome || idx}`}
+                            className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-white text-sm font-semibold truncate">{item.nome || '—'}</p>
+                              <span className="text-emerald-300 text-xs font-semibold">{formatPercent(item.roi)}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+                              <span>Vendas: <span className="text-white font-semibold">{item.vendas}</span></span>
+                              <span>Gasto: <span className="text-white font-semibold">{formatCurrency(item.gasto, 0)}</span></span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                              <span>CPL {formatCurrency(item.cpl)}</span>
+                              <span>CPA {formatCurrency(item.cpa)}</span>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="text-slate-500 text-sm py-4">Sem dados disponíveis.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-amber-300 text-xs font-semibold uppercase tracking-wide">
+                        {config.bottomLabel}
+                      </p>
+                      <div className="mt-2 space-y-3">
+                        {config.bottom.length > 0 ? config.bottom.map((item, idx) => (
+                          <div
+                            key={`${config.title}-bottom-${item.nome || idx}`}
+                            className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-white text-sm font-semibold truncate">{item.nome || '—'}</p>
+                              <span className="text-amber-300 text-xs font-semibold">
+                                {item.roi !== null && item.roi !== undefined ? formatPercent(item.roi) : '—'}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+                              <span>Vendas: <span className="text-white font-semibold">{item.vendas}</span></span>
+                              <span>Gasto: <span className="text-white font-semibold">{formatCurrency(item.gasto, 0)}</span></span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                              <span>CPL {formatCurrency(item.cpl)}</span>
+                              <span>CPA {formatCurrency(item.cpa)}</span>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="text-slate-500 text-sm py-4">Sem dados disponíveis.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {/* Checkout e Top Campanhas */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Checkout */}
@@ -1028,6 +2093,156 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Segmentação por origem e dispositivo */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-white font-semibold">Origem dos leads</h3>
+                    <p className="text-slate-500 text-sm">Leads, vendas e investimento por canal</p>
+                  </div>
+                  <span className="text-xs text-slate-500">utm_source</span>
+                </div>
+                <div className="h-72">
+                  {topOrigens.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        layout="vertical"
+                        data={topOrigens.map((item) => ({
+                          label: item.label,
+                          Leads: item.leads,
+                          Vendas: item.vendas,
+                          Investido: item.gasto,
+                        }))}
+                        margin={{ top: 8, right: 32, left: 0, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" horizontal={false} />
+                        <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis type="category" dataKey="label" width={140} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          formatter={(value: any, name: any) => {
+                            if (name === 'Investido') {
+                              return [formatCurrency(Number(value), 0), 'Investido'];
+                            }
+                            return [Number(value).toLocaleString('pt-BR'), name];
+                          }}
+                        />
+                        <Legend formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>} />
+                        <Bar dataKey="Leads" fill="rgb(56 189 248)" barSize={18} radius={[0, 6, 6, 0]} />
+                        <Bar dataKey="Vendas" fill="rgb(16 185 129)" barSize={18} radius={[0, 6, 6, 0]} />
+                        <Line
+                          dataKey="Investido"
+                          stroke="rgb(245 158 11)"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                      Sem dados de origem.
+                    </div>
+                  )}
+                </div>
+                {topOrigens.length > 0 && (
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-400">
+                    {topOrigens.slice(0, 4).map((item) => (
+                      <div key={`origem-summary-${item.label}`} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
+                        <p className="text-white text-sm font-semibold mb-1 truncate">{item.label}</p>
+                        <div className="flex items-center justify-between">
+                          <span>Leads</span>
+                          <span className="text-white font-semibold">{item.leads.toLocaleString('pt-BR')}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Vendas</span>
+                          <span className="text-emerald-300 font-semibold">{item.vendas.toLocaleString('pt-BR')}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Investido</span>
+                          <span className="text-amber-300 font-semibold">{formatCurrency(item.gasto, 0)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-white font-semibold">Dispositivos</h3>
+                    <p className="text-slate-500 text-sm">Distribuição de leads por dispositivo</p>
+                  </div>
+                  <span className="text-xs text-slate-500">device</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                  <div className="h-64">
+                    {topDevices.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={topDevices.map((item) => ({
+                              name: item.label,
+                              value: item.leads,
+                            }))}
+                            innerRadius={45}
+                            outerRadius={70}
+                            paddingAngle={4}
+                            dataKey="value"
+                          >
+                            {topDevices.map((_, idx) => (
+                              <Cell
+                                key={`device-slice-${idx}`}
+                                fill={['#0ea5e9', '#22c55e', '#a855f7', '#f97316', '#eab308'][idx % 5]}
+                                stroke="rgb(15 23 42)"
+                                strokeWidth={2}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: any) => Number(value).toLocaleString('pt-BR')}
+                            labelFormatter={(label: any) => label}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                        Sem dados de dispositivo.
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {topDevices.map((item) => {
+                      const percent = totalDeviceLeads > 0 ? (item.leads / totalDeviceLeads) * 100 : 0;
+                      return (
+                        <div key={`device-${item.label}`} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-white text-sm font-semibold">{item.label}</p>
+                            <span className="text-slate-400 text-xs">{percent.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Leads</span>
+                            <span className="text-white font-semibold">{item.leads.toLocaleString('pt-BR')}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Automação</span>
+                            <span className="text-purple-300 font-semibold">{item.automacao.toLocaleString('pt-BR')}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Vendas</span>
+                            <span className="text-emerald-300 font-semibold">{item.vendas.toLocaleString('pt-BR')}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {topDevices.length === 0 && (
+                      <p className="text-slate-500 text-sm">Sem dados de dispositivo.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Funil do Quiz - Design Premium */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800/95 to-slate-900 border border-slate-700/60 shadow-2xl">
               {/* Background pattern */}
@@ -1090,6 +2305,11 @@ export default function DashboardPage() {
                   const totalRate = funnelData[0]?.value > 0 ? ((item.value / funnelData[0].value) * 100) : 0;
                   return { ...item, rate, totalRate };
                 });
+                const worstStep = funnelWithRates.slice(1).reduce<null | { name: string; drop: number }>((acc, item) => {
+                  const drop = 100 - item.rate;
+                  if (!acc || drop > acc.drop) return { name: item.name, drop };
+                  return acc;
+                }, null);
 
                 return (
                   <div className="relative p-8">
@@ -1192,10 +2412,11 @@ export default function DashboardPage() {
                             <div>
                               <p className="text-slate-400 text-xs mb-1">Maior queda</p>
                               <p className="text-amber-400 text-xl font-bold">
-                                {funnelWithRates.length > 1
-                                  ? Math.max(...funnelWithRates.slice(1).map((item) => 100 - item.rate)).toFixed(1)
-                                  : '0.0'}%
+                                {worstStep ? worstStep.drop.toFixed(1) : '0.0'}%
                               </p>
+                              {worstStep && (
+                                <p className="text-slate-500 text-[11px]">Etapa: {worstStep.name}</p>
+                              )}
                             </div>
                           </div>
                         </div>

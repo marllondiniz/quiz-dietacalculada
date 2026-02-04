@@ -3,16 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-// URLs de checkout - 100% Hubla
-// (Cakto desabilitado temporariamente)
+// URLs de checkout - Hubla
 const CHECKOUT_URLS = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
     monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
-  },
-  cakto: {
-    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
-    monthly: 'https://pay.cakto.com.br/bigpf3i',
   },
 };
 
@@ -353,14 +348,7 @@ export default function VendasPage() {
   };
 
   const handleCheckout = (plan: 'annual' | 'monthly') => {
-    // ✅ 100% HUBLA - Sempre direciona para Hubla
     const checkoutUrl = CHECKOUT_URLS.hubla[plan];
-    
-    /* CÓDIGO ANTERIOR (Split 50/50) - COMENTADO
-    const useHubla = Math.random() < 0.5;
-    const checkoutUrl = useHubla ? CHECKOUT_URLS.hubla[plan] : CHECKOUT_URLS.cakto[plan];
-    */
-    
     window.location.href = checkoutUrl;
   };
 

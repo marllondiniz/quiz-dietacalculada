@@ -38,12 +38,12 @@ export interface AutomationLead {
   created_at: string;
   purchased: boolean;
   zaia_sent: boolean;
-  checkout_source: 'hubla' | 'cakto' | '';
+  checkout_source: string;
   purchase_at: string;
 }
 
 // Tipo para checkout source
-export type CheckoutSource = 'hubla' | 'cakto';
+export type CheckoutSource = 'hubla';
 
 /**
  * Cria instância autenticada do Google Sheets
@@ -182,7 +182,7 @@ export async function getAllLeads(): Promise<AutomationLead[]> {
     created_at: row[COLUMN_INDEXES.created_at] || '',
     purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
     zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-    checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
+    checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
     purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
   }));
 }
@@ -223,7 +223,7 @@ export async function findLeadByEmailOrPhone(
           created_at: row[COLUMN_INDEXES.created_at] || '',
           purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
+              checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
         },
         rowIndex: i + 1, // +1 porque a planilha é 1-indexed
@@ -241,7 +241,7 @@ export async function findLeadByEmailOrPhone(
           created_at: row[COLUMN_INDEXES.created_at] || '',
           purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
         },
         rowIndex: i + 1,
@@ -608,7 +608,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
           created_at: createdAt,
           purchased: false,
           zaia_sent: false,
-          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as '' | 'hubla' | 'cakto',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: '',
         };
 
@@ -781,7 +781,7 @@ export async function ensureSalesSheetExists(): Promise<void> {
 export interface SaleData {
   purchaseDate?: string;
   paymentDate?: string;
-  checkout: 'hubla' | 'cakto';
+  checkout: 'hubla';
   transactionId?: string;
   plan?: string;
   grossValue?: number;
