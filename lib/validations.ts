@@ -98,7 +98,7 @@ export const leadCaptureSchema = z.object({
   FirstName: z.string().min(1, 'Nome é obrigatório').trim(),
   email: emailSchema.optional(),
   phone: phoneSchema.optional(),
-  checkout_source: z.enum(['hubla', 'cakto']).optional(),
+  checkout_source: z.enum(['hubla']).optional(),
 }).refine(
   (data) => data.email || data.phone,
   {
@@ -114,7 +114,7 @@ export const saleApprovedSchema = z.object({
   action: z.enum(['sale', 'venda', 'purchase']).optional(),
   email: emailSchema.optional(),
   phone: phoneSchema.optional(),
-  checkout_source: z.enum(['hubla', 'cakto']).optional(),
+  checkout_source: z.enum(['hubla']).optional(),
   transaction_id: z.string().optional(),
   amount: z.number().positive().optional(),
   plan: z.enum(['annual', 'monthly']).optional(),

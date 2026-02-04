@@ -65,34 +65,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Detectar origem pelos HEADERS da Hubla ou pelo body
+    // Apenas Hubla é suportado no momento
     const isHubla = isRequestFromHubla(request);
-    const isCakto = isRequestFromCakto(request, body);
-    
-    let source: 'hubla' | 'cakto' = isHubla ? 'hubla' : 'cakto';
-    
-    // Se veio explicitamente no body, usar isso
-    if (body.checkout_source && ['hubla', 'cakto'].includes(body.checkout_source)) {
-      source = body.checkout_source;
+    if (!isHubla) {
+      return NextResponse.json({
+        success: false,
+        error: 'Apenas webhooks da Hubla são suportados no momento',
+      }, { status: 400 });
     }
 
-    const { eventType, data } = detectEventType(body, source);
+    const { eventType, data } = detectEventType(body);
 
     await ensureAutomationSheetExists();
 
     // Executar ação baseada no tipo de evento
     switch (eventType) {
       case 'lead_capture':
-        return handleLeadCapture(data, source);
+        return handleLeadCapture(data, 'hubla');
       
       case 'sale_approved':
-        return handleSaleApproved(data, source);
+        return handleSaleApproved(data, 'hubla');
       
       default:
         return NextResponse.json({
           success: false,
           error: 'Tipo de evento não reconhecido',
-          detected_source: source,
+          detected_source: 'hubla',
           detected_event: eventType,
         }, { status: 400 });
     }
@@ -127,7 +125,6 @@ export async function GET(request: NextRequest) {
       pendingZaia: leads.filter((l) => !l.purchased && !l.zaia_sent).length,
       bySource: {
         hubla: leads.filter((l) => l.checkout_source === 'hubla').length,
-        cakto: leads.filter((l) => l.checkout_source === 'cakto').length,
       },
     };
 
@@ -143,10 +140,6 @@ export async function GET(request: NextRequest) {
           hubla: {
             lead_capture: ['lead.created', 'lead.abandoned_checkout'],
             sale_approved: ['invoice.payment.approved', 'sale.created', 'purchase.approved'],
-          },
-          cakto: {
-            lead_capture: '{ action: "capture", FirstName, email, phone, checkout_source: "cakto" }',
-            sale_approved: '{ action: "sale", email, phone, checkout_source: "cakto" }',
           },
         },
       },
@@ -173,21 +166,6 @@ function isRequestFromHubla(request: NextRequest): boolean {
   const hublaIdempotency = request.headers.get('x-hubla-idempotency');
   
   return !!(hublaToken || hublaIdempotency);
-}
-
-/**
- * Verifica se a requisição vem do Cakto
- */
-function isRequestFromCakto(request: NextRequest, body: any): boolean {
-  // Headers específicos do Cakto (se houver)
-  const caktoToken = request.headers.get('x-cakto-token');
-  
-  // Ou verificar no body se tem identificador do Cakto
-  const hasCaktoIndicator = body.checkout_source === 'cakto' || 
-                           body.source === 'cakto' ||
-                           (body.checkout_url && body.checkout_url.includes('cakto.com.br'));
-  
-  return !!(caktoToken || hasCaktoIndicator);
 }
 
 // ==========================================
@@ -221,11 +199,8 @@ interface DetectedEventData {
   };
 }
 
-function detectEventType(body: any, source: 'hubla' | 'cakto'): DetectedEventData {
-  if (source === 'hubla') {
-    return detectHublaEventType(body);
-  }
-  return detectCaktoEventType(body);
+function detectEventType(body: any): DetectedEventData {
+  return detectHublaEventType(body);
 }
 
 function detectHublaEventType(body: any): DetectedEventData {
@@ -255,53 +230,6 @@ function detectHublaEventType(body: any): DetectedEventData {
   }
 
   return { eventType, data };
-}
-
-function detectCaktoEventType(body: any): DetectedEventData {
-  const action = (body.action || '').toLowerCase();
-
-  // Venda aprovada – extrair todos os campos possíveis para a Lista Vendas
-  if (action === 'sale' || action === 'venda' || action === 'purchase') {
-    const amount = body.amount ?? body.total ?? body.valor;
-    const num = (v: unknown): number | undefined => {
-      if (v == null) return undefined;
-      const n = typeof v === 'number' ? v : parseFloat(String(v));
-      return Number.isFinite(n) ? n : undefined;
-    };
-    return {
-      eventType: 'sale_approved',
-      data: {
-        FirstName: body.FirstName || body.firstName || body.name || body.nome,
-        email: body.email?.trim().toLowerCase(),
-        phone: normalizePhone(body.phone || body.telefone),
-        transactionId: body.transactionId || body.transaction_id || body.id,
-        plan: body.plan,
-        grossValue: num(amount ?? body.grossValue),
-        netValue: num(body.netAmount ?? body.net_amount ?? body.netValue),
-        paymentMethod: body.paymentMethod || body.payment_method,
-        offerName: body.offerName || body.offer_name,
-        purchaseDate: body.purchaseDate || body.createdAt,
-        paymentDate: body.paymentDate || body.paidAt,
-        utmSource: (body.utm_source || body.utmSource || '').toString().trim(),
-        utmCampaign: (body.utm_campaign || body.utmCampaign || '').toString().trim(),
-        utmMedium: (body.utm_medium || body.utmMedium || '').toString().trim(),
-        utmContent: (body.utm_content || body.utmContent || '').toString().trim(),
-        utmTerm: (body.utm_term || body.utmTerm || '').toString().trim(),
-        coupon: body.coupon || body.cupom || '',
-      },
-    };
-  }
-
-  // Default: captura de lead
-  return {
-    eventType: 'lead_capture',
-    data: {
-      lead_id: body.lead_id,
-      FirstName: body.FirstName || body.firstName || body.name || body.nome,
-      email: body.email?.trim().toLowerCase(),
-      phone: normalizePhone(body.phone || body.telefone),
-    },
-  };
 }
 
 function extractHublaData(body: any): DetectedEventData['data'] {
@@ -497,7 +425,7 @@ function runSheetDryRunTest(): NextResponse {
 
   for (const { name, body } of mockPayloads) {
     try {
-      const { eventType, data } = detectEventType(body, 'hubla');
+      const { eventType, data } = detectEventType(body);
       if (eventType !== 'sale_approved') {
         results.push({ name, eventType, error: 'Não detectado como sale_approved' });
         continue;
@@ -560,7 +488,7 @@ function runSheetDryRunTest(): NextResponse {
 
 async function handleLeadCapture(
   data: DetectedEventData['data'],
-  source: 'hubla' | 'cakto'
+  source: 'hubla'
 ): Promise<NextResponse> {
   const { lead_id, FirstName, email, phone } = data;
 
@@ -608,7 +536,7 @@ async function handleLeadCapture(
 
 async function handleSaleApproved(
   data: DetectedEventData['data'],
-  source: 'hubla' | 'cakto'
+  source: 'hubla'
 ): Promise<NextResponse> {
   const { email, phone } = data;
 

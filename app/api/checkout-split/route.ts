@@ -8,21 +8,17 @@ import { upsertLead } from '@/lib/leadsAutomation';
  * Todos os usuários são direcionados para Hubla
  */
 
-export type CheckoutVariant = 'hubla' | 'cakto';
+export type CheckoutVariant = 'hubla';
 export type PlanType = 'annual' | 'monthly';
 
 const CHECKOUT_VERSION = '100_hubla_v2';
 const DATA_SHEET_NAME = 'Página1';
 
-// URLs de checkout - Split 50/50 entre Hubla e Cakto
-const CHECKOUT_URLS = {
+// URLs de checkout - Hubla
+const CHECKOUT_URLS: Record<CheckoutVariant, { annual: string; monthly: string }> = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
     monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
-  },
-  cakto: {
-    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
-    monthly: 'https://pay.cakto.com.br/bigpf3i',
   },
 };
 

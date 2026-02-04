@@ -6,7 +6,7 @@
  * Persistência por 30 dias via localStorage/cookie
  */
 
-export type CheckoutVariant = 'hubla' | 'cakto';
+export type CheckoutVariant = 'hubla';
 export type PlanType = 'annual' | 'monthly';
 
 export const SPLIT_VERSION = '100_hubla_v2';
@@ -19,15 +19,11 @@ interface StoredVariant {
   splitVersion: string;
 }
 
-// URLs de checkout
-const CHECKOUT_URLS = {
+// URLs de checkout - Hubla
+const CHECKOUT_URLS: Record<CheckoutVariant, { annual: string; monthly: string }> = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
     monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
-  },
-  cakto: {
-    annual: 'https://pay.cakto.com.br/kvar8c2_742083',
-    monthly: 'https://pay.cakto.com.br/bigpf3i',
   },
 };
 
