@@ -235,6 +235,18 @@ export default function DashboardPage() {
   const [filterAnuncio, setFilterAnuncio] = useState<string>('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [timelineView, setTimelineView] = useState<'daily' | 'weekly'>('daily');
+  // Estados para controlar expansão das tabelas de performance
+  const [expandedSections, setExpandedSections] = useState<{
+    campanhas: boolean;
+    conjuntos: boolean;
+    anuncios: boolean;
+  }>({
+    campanhas: false,
+    conjuntos: false,
+    anuncios: false,
+  });
+  // Estado para controlar expansão das perguntas do quiz
+  const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -288,7 +300,9 @@ export default function DashboardPage() {
     vendasPorCampanha: {} as Record<string, number>,
     vendasPorFormaPagamento: { pix: 0, cartaoCredito: 0 },
     amountSpentTotal: 0,
+    lucro: 0,
     roi: null as number | null,
+    roas: null as number | null,
     funnelResumo: {
       leads: 0,
       automacao: 0,
@@ -304,8 +318,9 @@ export default function DashboardPage() {
     filteredZaiaCount: 0,
     filteredLeadsAutomacaoCount: 0,
     filteredGastosCount: 0,
-    timelineDaily: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
-    timelineWeekly: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
+    filteredPagina1: [] as string[][],
+    timelineDaily: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number; faturamentoLiquido: number; lucro: number }>,
+    timelineWeekly: [] as Array<{ key: string; label: string; leads: number; automacao: number; vendas: number; gasto: number; faturamentoLiquido: number; lucro: number }>,
     segmentacaoOrigem: [] as Array<{ label: string; leads: number; automacao: number; vendas: number; gasto: number }>,
     segmentacaoDispositivo: [] as Array<{ label: string; leads: number; automacao: number; vendas: number }>,
     performanceCampanhas: [] as Array<{
@@ -340,6 +355,7 @@ export default function DashboardPage() {
     }>,
     cpl: null as number | null,
     cpa: null as number | null,
+    custoPorVenda: null as number | null,
     ticketMedioBruto: null as number | null,
     ticketMedioLiquido: null as number | null,
     automationMetrics: {
@@ -356,6 +372,15 @@ export default function DashboardPage() {
     opcoesCampanha: [] as string[],
     opcoesConjunto: [] as string[],
     opcoesAnuncio: [] as string[],
+    // Métricas de tráfego
+    totalReach: 0,
+    totalImpressions: 0,
+    totalLandingPageViews: 0,
+    avgFrequency: 0,
+    avgCTR: 0,
+    avgCPC: 0,
+    totalClicks: 0,
+    cpm: null as number | null,
   }), []);
 
   const filteredResumo = useMemo(() => {
@@ -382,13 +407,47 @@ export default function DashboardPage() {
       return Number.isNaN(d.getTime()) ? null : d;
     };
     const vendasHeaders = data.listaVendas?.headers ?? [];
-    const vendasRows = data.listaVendas?.rows ?? [];
+    const vendasRows = (data.listaVendas?.rows ?? []).filter((row, idx) => {
+      // Garantir que não conta a linha de header caso tenha vindo nas rows
+      if (idx === 0 && row.length > 0) {
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        // Se a primeira célula contém palavras típicas de header, ignorar
+        if (firstCell.includes('data') || firstCell.includes('date') || firstCell === 'a') {
+          return false;
+        }
+      }
+      return true;
+    });
     const gastosHeaders = data.gastosTrafico?.headers ?? [];
-    const gastosRows = data.gastosTrafico?.rows ?? [];
+    const gastosRows = (data.gastosTrafico?.rows ?? []).filter((row, idx) => {
+      if (idx === 0 && row.length > 0) {
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        if (firstCell.includes('data') || firstCell.includes('date') || firstCell === 'a') {
+          return false;
+        }
+      }
+      return true;
+    });
     const pagina1Headers = data.pagina1?.headers ?? [];
-    const pagina1Rows = data.pagina1?.rows ?? [];
+    const pagina1Rows = (data.pagina1?.rows ?? []).filter((row, idx) => {
+      if (idx === 0 && row.length > 0) {
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        if (firstCell.includes('data') || firstCell.includes('date') || firstCell === 'a') {
+          return false;
+        }
+      }
+      return true;
+    });
     const leadsAutomacaoHeaders = data.leadsAutomacao?.headers ?? [];
-    const leadsAutomacaoRows = data.leadsAutomacao?.rows ?? [];
+    const leadsAutomacaoRows = (data.leadsAutomacao?.rows ?? []).filter((row, idx) => {
+      if (idx === 0 && row.length > 0) {
+        const firstCell = String(row[0] || '').toLowerCase().trim();
+        if (firstCell.includes('lead') || firstCell.includes('id') || firstCell === 'a') {
+          return false;
+        }
+      }
+      return true;
+    });
 
     const resolveIndex = (idx: number, fallback?: number) => (idx >= 0 ? idx : fallback ?? -1);
     const parseMoney = (value: unknown): number => {
@@ -491,6 +550,13 @@ export default function DashboardPage() {
     const gastosCanalIdx = findColumnIndex(gastosHeaders, 'utm_source', 'source', 'origem', 'channel');
     const gastosDeviceIdx = findColumnIndex(gastosHeaders, 'device', 'dispositivo', 'platform');
     const gastosAmountIdx = findColumnIndex(gastosHeaders, 'amount spent', 'valor gasto', 'spent', 'custo');
+    // Métricas de tráfego
+    const gastosReachIdx = findColumnIndex(gastosHeaders, 'reach', 'alcance', 'Reach');
+    const gastosFrequencyIdx = findColumnIndex(gastosHeaders, 'frequency', 'frequência', 'freq', 'Frequency');
+    const gastosImpressionsIdx = findColumnIndex(gastosHeaders, 'impressions', 'impressões', 'imp', 'Impressions');
+    const gastosLandingPageViewsIdx = findColumnIndex(gastosHeaders, 'landing page views', 'visualizações página', 'landing page', 'Landing Page Views', 'page views');
+    const gastosCTRIdx = findColumnIndex(gastosHeaders, 'ctr', 'link click-through rate', 'click-through rate', 'CTR', 'Link CTR');
+    const gastosCPCIdx = findColumnIndex(gastosHeaders, 'cpc', 'cost per link click', 'cost per click', 'CPC', 'Link CPC');
 
     const pagina1DateIdx = findColumnIndex(pagina1Headers, 'data', 'date', 'dia', 'created_at', 'timestamp');
     const pagina1CampanhaIdx = findColumnIndex(pagina1Headers, 'utm_campaign', 'campaign', 'campanha', 'Campanha');
@@ -661,9 +727,13 @@ export default function DashboardPage() {
 
     const filteredLeadsCount = filteredPagina1.length;
     const filteredLeadsAutomacaoCount = filteredLeadsAutomacao.length;
+    
+    // Contar vendas marcadas na tabela de automação (coluna purchased = 'true')
+    // Nota: Nem todas as vendas podem estar marcadas aqui, então este é um número aproximado
     const filteredPurchasedCount = filteredLeadsAutomacao.filter(
       (row) => String(row[5] || '').toLowerCase() === 'true'
     ).length;
+    
     const filteredZaiaCount = filteredLeadsAutomacao.filter(
       (row) => String(row[6] || '').toLowerCase() === 'true'
     ).length;
@@ -676,16 +746,16 @@ export default function DashboardPage() {
 
     const dailyMap = new Map<
       string,
-      { key: string; date: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number }
+      { key: string; date: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number; faturamentoLiquido: number; lucro: number }
     >();
     const weeklyMap = new Map<
       string,
-      { key: string; startDate: Date; endDate: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number }
+      { key: string; startDate: Date; endDate: Date; label: string; leads: number; automacao: number; vendas: number; gasto: number; faturamentoLiquido: number; lucro: number }
     >();
     const ensureDailyEntry = (key: string, date: Date) => {
       let entry = dailyMap.get(key);
       if (!entry) {
-        entry = { key, date, label: formatDayMonth(date), leads: 0, automacao: 0, vendas: 0, gasto: 0 };
+        entry = { key, date, label: formatDayMonth(date), leads: 0, automacao: 0, vendas: 0, gasto: 0, faturamentoLiquido: 0, lucro: 0 };
         dailyMap.set(key, entry);
       }
       return entry;
@@ -704,6 +774,8 @@ export default function DashboardPage() {
           automacao: 0,
           vendas: 0,
           gasto: 0,
+          faturamentoLiquido: 0,
+          lucro: 0,
         };
         weeklyMap.set(key, entry);
       }
@@ -853,9 +925,17 @@ export default function DashboardPage() {
     const conversionDiffs: number[] = [];
     filteredVendas.forEach((row) => {
       const date = parseDate(vendasDateIdxRes >= 0 ? row[vendasDateIdxRes] : row[0]);
+      const valorBruto = parseMoney(vendasValorBrutoIdxRes >= 0 ? row[vendasValorBrutoIdxRes] : row[5]);
+      const valorLiquido = parseMoney(vendasValorLiquidoIdxRes >= 0 ? row[vendasValorLiquidoIdxRes] : row[6]);
+      
       if (date) {
-        ensureDailyEntry(toDateKey(date), date).vendas += 1;
-        ensureWeeklyEntry(toWeekKey(date), getWeekStart(date)).vendas += 1;
+        const dailyEntry = ensureDailyEntry(toDateKey(date), date);
+        dailyEntry.vendas += 1;
+        dailyEntry.faturamentoLiquido += valorLiquido;
+        
+        const weeklyEntry = ensureWeeklyEntry(toWeekKey(date), getWeekStart(date));
+        weeklyEntry.vendas += 1;
+        weeklyEntry.faturamentoLiquido += valorLiquido;
       }
 
       let campanha = vendasCampanhaIdxRes >= 0 ? normalizeLabel(row[vendasCampanhaIdxRes], '') : '';
@@ -863,8 +943,6 @@ export default function DashboardPage() {
       let anuncio = vendasAnuncioIdxRes >= 0 ? normalizeLabel(row[vendasAnuncioIdxRes], '') : '';
       const origemVenda = vendasSourceIdxRes >= 0 ? normalizeLabel(row[vendasSourceIdxRes], 'Sem origem') : undefined;
       const deviceVenda = vendasMediumIdxRes >= 0 ? normalizeLabel(row[vendasMediumIdxRes], '') : undefined;
-      const valorBruto = parseMoney(vendasValorBrutoIdxRes >= 0 ? row[vendasValorBrutoIdxRes] : row[5]);
-      const valorLiquido = parseMoney(vendasValorLiquidoIdxRes >= 0 ? row[vendasValorLiquidoIdxRes] : row[6]);
 
       const identifiers = extractIdentifiers(row, {
         emailIdx: vendasEmailIdxRes,
@@ -924,6 +1002,8 @@ export default function DashboardPage() {
         automacao: entry.automacao,
         vendas: entry.vendas,
         gasto: Number(entry.gasto.toFixed(2)),
+        faturamentoLiquido: Number(entry.faturamentoLiquido.toFixed(2)),
+        lucro: Number((entry.faturamentoLiquido - entry.gasto).toFixed(2)),
       }));
 
     const timelineWeekly = Array.from(weeklyMap.values())
@@ -935,6 +1015,8 @@ export default function DashboardPage() {
         automacao: entry.automacao,
         vendas: entry.vendas,
         gasto: Number(entry.gasto.toFixed(2)),
+        faturamentoLiquido: Number(entry.faturamentoLiquido.toFixed(2)),
+        lucro: Number((entry.faturamentoLiquido - entry.gasto).toFixed(2)),
       }));
 
     const segmentacaoOrigem = Array.from(originMetrics.values()).map((entry) => ({
@@ -1080,15 +1162,84 @@ export default function DashboardPage() {
       return acc + parseMoney(value);
     }, 0) : 0;
 
+    // Calcular métricas de tráfego agregadas
+    const gastosReachIdxRes = resolveIndex(gastosReachIdx);
+    const gastosFrequencyIdxRes = resolveIndex(gastosFrequencyIdx);
+    const gastosImpressionsIdxRes = resolveIndex(gastosImpressionsIdx);
+    const gastosLandingPageViewsIdxRes = resolveIndex(gastosLandingPageViewsIdx);
+    const gastosCTRIdxRes = resolveIndex(gastosCTRIdx);
+    const gastosCPCIdxRes = resolveIndex(gastosCPCIdx);
+
+    const parseNumber = (value: string | undefined): number => {
+      if (!value) return 0;
+      const cleaned = String(value).replace(/[^\d.,-]/g, '').replace(',', '.');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
+
+    const totalReach = gastosReachIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseNumber(row[gastosReachIdxRes]);
+    }, 0) : 0;
+
+    const totalFrequency = gastosFrequencyIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseNumber(row[gastosFrequencyIdxRes]);
+    }, 0) : 0;
+    const avgFrequency = filteredGastos.length > 0 ? totalFrequency / filteredGastos.length : 0;
+
+    const totalImpressions = gastosImpressionsIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseNumber(row[gastosImpressionsIdxRes]);
+    }, 0) : 0;
+
+    const totalLandingPageViews = gastosLandingPageViewsIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseNumber(row[gastosLandingPageViewsIdxRes]);
+    }, 0) : 0;
+
+    // CTR pode vir como porcentagem (ex: "2.5%") ou decimal (ex: "0.025")
+    const parseCTR = (value: string | undefined): number => {
+      if (!value) return 0;
+      const cleaned = String(value).replace(/[^\d.,-]/g, '').replace(',', '.');
+      const num = parseFloat(cleaned);
+      if (isNaN(num)) return 0;
+      // Se o número é maior que 1, provavelmente está em formato de porcentagem (ex: 2.5 = 2.5%)
+      return num > 1 ? num : num * 100;
+    };
+    const totalCTR = gastosCTRIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseCTR(row[gastosCTRIdxRes]);
+    }, 0) : 0;
+    const avgCTR = filteredGastos.length > 0 ? totalCTR / filteredGastos.length : 0;
+
+    // CPC pode vir como valor monetário (ex: "R$ 0,50" ou "0.50")
+    const totalCPC = gastosCPCIdxRes >= 0 ? filteredGastos.reduce((acc, row) => {
+      return acc + parseMoney(row[gastosCPCIdxRes] || '0');
+    }, 0) : 0;
+    const avgCPC = filteredGastos.length > 0 ? totalCPC / filteredGastos.length : 0;
+
+    // Calcular cliques a partir de Impressions e CTR
+    const totalClicks = avgCTR > 0 && totalImpressions > 0 
+      ? Math.round((totalImpressions * avgCTR) / 100) 
+      : 0;
+
+    // Calcular CPM (Cost per 1000 Impressions)
+    const cpm = totalImpressions > 0 
+      ? (amountSpentTotal / totalImpressions) * 1000 
+      : null;
+
+    // Métricas financeiras - usar valor LÍQUIDO (após taxas) para cálculos reais
+    const lucro = totalVendasLiquido - amountSpentTotal; // Lucro = Faturamento líquido - Investimento
     const roi = amountSpentTotal > 0
-      ? ((totalVendasValue - amountSpentTotal) / amountSpentTotal) * 100
+      ? ((totalVendasLiquido - amountSpentTotal) / amountSpentTotal) * 100 // ✅ Usar líquido, não bruto
+      : null;
+    const roas = amountSpentTotal > 0
+      ? totalVendasLiquido / amountSpentTotal // ROAS = Faturamento líquido / Investimento
       : null;
 
     const cpl = filteredLeadsCount > 0 ? amountSpentTotal / filteredLeadsCount : null;
     const cpa = filteredPurchasedCount > 0 ? amountSpentTotal / filteredPurchasedCount : null;
+    const custoPorVenda = filteredPurchasedCount > 0 ? amountSpentTotal / filteredPurchasedCount : null;
     const ticketMedioBruto = filteredPurchasedCount > 0 ? totalVendasValue / filteredPurchasedCount : null;
     const ticketMedioLiquido = filteredPurchasedCount > 0 ? totalVendasLiquido / filteredPurchasedCount : null;
     const leadToAutomationRate = filteredLeadsCount > 0 ? (filteredLeadsAutomacaoCount / filteredLeadsCount) * 100 : null;
+    // Checkout → Venda: vendas marcadas na automação (que vieram de checkouts) / total de checkouts
     const automationToSaleRate =
       filteredLeadsAutomacaoCount > 0 ? (filteredPurchasedCount / filteredLeadsAutomacaoCount) * 100 : null;
     const leadToSaleRate = filteredLeadsCount > 0 ? (filteredPurchasedCount / filteredLeadsCount) * 100 : null;
@@ -1156,13 +1307,13 @@ export default function DashboardPage() {
       vendasPorCampanha,
       vendasPorFormaPagamento,
       amountSpentTotal,
-      roi,
       funnelResumo,
       filteredLeadsCount,
       filteredPurchasedCount,
       filteredZaiaCount,
       filteredLeadsAutomacaoCount,
       filteredGastosCount: filteredGastos.length,
+      filteredPagina1,
       timelineDaily,
       timelineWeekly,
       segmentacaoOrigem,
@@ -1170,8 +1321,12 @@ export default function DashboardPage() {
       performanceCampanhas,
       performanceConjuntos,
       performanceAnuncios,
+      lucro,
+      roi,
+      roas,
       cpl,
       cpa,
+      custoPorVenda,
       ticketMedioBruto,
       ticketMedioLiquido,
       automationMetrics,
@@ -1180,22 +1335,32 @@ export default function DashboardPage() {
       opcoesCampanha: Array.from(allCampanhas).sort(),
       opcoesConjunto: Array.from(allConjuntos).sort(),
       opcoesAnuncio: Array.from(allAnuncios).sort(),
+      // Métricas de tráfego
+      totalReach,
+      totalImpressions,
+      totalLandingPageViews,
+      avgFrequency,
+      avgCTR,
+      avgCPC,
+      totalClicks,
+      cpm,
     };
   }, [data, filterDateFrom, filterDateTo, filterCampanha, filterConjunto, filterAnuncio, emptyResumo]);
 
   if (loading && !data) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <div className="text-center max-w-sm">
-          <img
-            src="/WhatsApp%20Image%202026-02-02%20at%2015.02.48.jpeg"
-            alt=""
-            className="w-full aspect-square object-cover rounded-2xl mb-6 shadow-xl border border-slate-700"
-          />
-          <p className="text-white font-semibold text-lg mb-2">
-            Parabéns! Marllin já está deixando tudo arrumadinho pra você!
-          </p>
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-sky-400 mt-2" />
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/40 flex items-center justify-center">
+              <IconChart className="w-5 h-5 text-sky-400" />
+            </div>
+            <div className="text-left">
+              <p className="text-slate-200 font-semibold text-lg">Carregando dashboard</p>
+              <p className="text-slate-400 text-sm">Buscando dados de vendas, leads e tráfego…</p>
+            </div>
+          </div>
+          <div className="inline-block h-9 w-9 animate-spin rounded-full border-2 border-slate-700 border-t-sky-400" />
         </div>
       </div>
     );
@@ -1228,7 +1393,9 @@ export default function DashboardPage() {
     vendasPorCampanha,
     vendasPorFormaPagamento,
     amountSpentTotal,
+    lucro,
     roi,
+    roas,
     funnelResumo,
     filteredVendas,
     filteredLeadsCount,
@@ -1236,6 +1403,7 @@ export default function DashboardPage() {
     filteredZaiaCount,
     filteredLeadsAutomacaoCount,
     filteredGastosCount,
+    filteredPagina1,
     quizFunnelData,
     opcoesCampanha,
     opcoesConjunto,
@@ -1249,10 +1417,19 @@ export default function DashboardPage() {
     performanceAnuncios,
     cpl,
     cpa,
+    custoPorVenda,
     ticketMedioBruto,
     ticketMedioLiquido,
     automationMetrics,
     alerts,
+    totalReach,
+    totalImpressions,
+    totalLandingPageViews,
+    avgFrequency,
+    avgCTR,
+    avgCPC,
+    totalClicks,
+    cpm,
   } = filteredResumo;
 
   const melhorAnuncio = (() => {
@@ -1453,7 +1630,7 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {activeTab === 'resumo' && (
-          <section className="space-y-6">
+          <section className="space-y-10">
             {/* Filtros */}
             <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-visible" lang="pt-BR">
               <button
@@ -1554,61 +1731,121 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Hero - Receita em Destaque */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-6 sm:p-8">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOGMxLjI1NCAwIDIuNDgtLjEyOCAzLjY2LS4zNzEiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjIiLz48L2c+PC9zdmc+')] opacity-30" />
-              <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                <div>
-                  <p className="text-emerald-100 text-sm font-medium mb-1">Receita Total {hasActiveFilters && '(filtrado)'}</p>
-                  <p className="text-white text-4xl sm:text-5xl font-bold tracking-tight">
+            {/* ETAPA 1: Métricas Gerais */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-sky-500 to-sky-600 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconChart className="w-6 h-6 text-sky-400" />
+                    Métricas Gerais
+                  </h2>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {/* Faturamento Bruto */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center">
+                      <IconCurrency className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-sm mb-1">Faturamento Bruto</p>
+                  <p className="text-white text-2xl font-bold">
                     {totalVendasValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
-                  <p className="text-emerald-100 text-sm mt-2">
-                    Líquido: <span className="font-semibold text-white">{totalVendasLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                    {roi !== null && (
-                      <span className="ml-3 text-emerald-200">
-                        ROI: <span className="font-semibold text-white">{roi >= 0 ? '+' : ''}{roi.toFixed(1)}%</span>
-                      </span>
-                    )}
+                </div>
+
+                {/* Faturamento Líquido */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/40 flex items-center justify-center">
+                      <IconCurrency className="w-5 h-5 text-teal-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-sm mb-1">Faturamento Líquido</p>
+                  <p className="text-white text-2xl font-bold">
+                    {totalVendasLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                  <IconCart className="w-5 h-5 text-white" />
-                  <span className="text-white font-semibold">{filteredVendas.length} vendas</span>
+
+                {/* Investimento */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-orange-500/10 border border-orange-500/40 flex items-center justify-center">
+                      <IconMegaphone className="w-5 h-5 text-orange-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-sm mb-1">Investimento</p>
+                  <p className="text-white text-2xl font-bold">
+                    {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
                 </div>
-              </div>
-              <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
-                  <div>
-                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Leads captados</p>
-                    <p className="text-white text-xl font-semibold mt-1">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
+
+                {/* Lucro */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${lucro >= 0 ? 'bg-green-500/10 border border-green-500/40' : 'bg-red-500/10 border border-red-500/40'}`}>
+                      <IconTrending className={`w-5 h-5 ${lucro >= 0 ? 'text-green-400' : 'text-red-400'}`} />
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-emerald-100/80 text-xs">Avançam p/ automação</p>
-                    <p className="text-white text-sm font-semibold">{formatPercent(leadToAutomationRateValue)}</p>
-                  </div>
+                  <p className="text-slate-400 text-sm mb-1">Lucro</p>
+                  <p className={`text-2xl font-bold ${lucro >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
-                  <div>
-                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Leads na automação</p>
-                    <p className="text-white text-xl font-semibold mt-1">{filteredLeadsAutomacaoCount.toLocaleString('pt-BR')}</p>
+
+                {/* ROAS */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/40 flex items-center justify-center">
+                      <IconChart className="w-5 h-5 text-purple-400" />
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-emerald-100/80 text-xs">Zaia ativos</p>
-                    <p className="text-white text-sm font-semibold">
-                      {filteredZaiaCount} · {formatPercent(zaiaRateValue)}
-                    </p>
-                  </div>
+                  <p className="text-slate-400 text-sm mb-1">ROAS</p>
+                  <p className="text-white text-2xl font-bold">
+                    {roas !== null ? `${roas.toFixed(2)}x` : 'N/A'}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 border border-white/20">
-                  <div>
-                    <p className="text-emerald-100/80 text-xs uppercase tracking-wide">Vendas concluídas</p>
-                    <p className="text-white text-xl font-semibold mt-1">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
+
+                {/* Vendas */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/40 flex items-center justify-center">
+                      <IconCart className="w-5 h-5 text-sky-400" />
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-emerald-100/80 text-xs">Lead → venda</p>
-                    <p className="text-white text-sm font-semibold">{formatPercent(leadToSaleRateValue)}</p>
+                  <p className="text-slate-400 text-sm mb-1">Vendas</p>
+                  <p className="text-white text-2xl font-bold">{filteredVendas.length}</p>
+                </div>
+
+                {/* Ticket Médio */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/40 flex items-center justify-center">
+                      <IconStore className="w-5 h-5 text-indigo-400" />
+                    </div>
                   </div>
+                  <p className="text-slate-400 text-sm mb-1">Ticket Médio</p>
+                  <p className="text-white text-2xl font-bold">
+                    {ticketMedioLiquido !== null && ticketMedioLiquido > 0
+                      ? ticketMedioLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                      : 'R$ 0,00'}
+                  </p>
+                </div>
+
+                {/* ROI */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${roi !== null && roi >= 0 ? 'bg-green-500/10 border border-green-500/40' : 'bg-red-500/10 border border-red-500/40'}`}>
+                      <IconTrending className={`w-5 h-5 ${roi !== null && roi >= 0 ? 'text-green-400' : 'text-red-400'}`} />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-sm mb-1">ROI</p>
+                  <p className={`text-2xl font-bold ${roi !== null && roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {roi !== null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : 'N/A'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1689,7 +1926,7 @@ export default function DashboardPage() {
                 <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
                 <p className="text-white text-2xl font-bold mt-1">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
                 <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
-                  <span className="text-slate-400">Automação → venda</span>
+                  <span className="text-slate-400">Checkout → venda</span>
                   <span className="text-emerald-300 font-semibold">{formatPercent(automationToSaleRateValue)}</span>
                 </div>
                 <div className="mt-2 h-2 bg-slate-900/60 rounded-full overflow-hidden">
@@ -1751,21 +1988,34 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Linha do tempo */}
-            <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/60 p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                <div>
-                  <h3 className="text-white font-semibold">Linha do tempo de performance</h3>
-                  <p className="text-slate-500 text-sm">{timelineSubtitle}</p>
+            {/* ETAPA 2: Gráfico Faturamento Líquido vs Investimento vs Lucro */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-emerald-500 to-emerald-600 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconChart className="w-6 h-6 text-emerald-400" />
+                    Performance Financeira
+                  </h2>
                 </div>
-                <div className="inline-flex items-center bg-slate-700/50 rounded-full p-1 border border-slate-600/70">
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/60 p-7 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div>
+                    <p className="text-slate-400 text-sm">
+                      {timelineView === 'daily' ? 'Evolução diária' : 'Evolução semanal'}
+                    </p>
+                  </div>
+                <div className="inline-flex items-center bg-slate-900/60 rounded-full p-1.5 border border-slate-600/70 shadow-inner">
                   <button
                     type="button"
                     onClick={() => setTimelineView('daily')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    className={`px-5 py-2.5 text-sm font-semibold rounded-full transition-all ${
                       timelineView === 'daily'
-                        ? 'bg-sky-500/80 text-white shadow-md'
-                        : 'text-slate-300 hover:text-white'
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                     }`}
                   >
                     Diário
@@ -1773,104 +2023,227 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => setTimelineView('weekly')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    className={`px-5 py-2.5 text-sm font-semibold rounded-full transition-all ${
                       timelineView === 'weekly'
-                        ? 'bg-sky-500/80 text-white shadow-md'
-                        : 'text-slate-300 hover:text-white'
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                     }`}
                   >
                     Semanal
                   </button>
                 </div>
               </div>
-              <div className="h-72">
+              <div className="h-80">
                 {timelineData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                       data={timelineData}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis
-                        yAxisId="left"
-                        tick={{ fill: '#94a3b8', fontSize: 11 }}
-                        axisLine={false}
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" vertical={false} />
+                      <XAxis 
+                        dataKey="label" 
+                        tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                        axisLine={{ stroke: '#475569' }} 
                         tickLine={false}
-                        allowDecimals={false}
                       />
                       <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        tick={{ fill: '#94a3b8', fontSize: 11 }}
-                        axisLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        axisLine={{ stroke: '#475569' }}
                         tickLine={false}
                         tickFormatter={(value) =>
                           Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
                         }
                       />
-                      <Tooltip content={<TimelineTooltip />} />
-                      <Legend
-                        wrapperStyle={{ paddingTop: 10 }}
-                        formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(71, 85, 105, 0.8)',
+                          borderRadius: '12px',
+                          padding: '12px',
+                        }}
+                        labelStyle={{ color: '#e2e8f0', fontWeight: 'bold', marginBottom: '8px' }}
+                        formatter={(value: any) => [
+                          Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                          '',
+                        ]}
                       />
+                      <Legend
+                        wrapperStyle={{ paddingTop: 16 }}
+                        formatter={(value) => <span className="text-slate-300 text-sm font-medium">{value}</span>}
+                      />
+                      {/* Faturamento Líquido em azul (principal) */}
                       <Area
-                        yAxisId="right"
+                        type="monotone"
+                        dataKey="faturamentoLiquido"
+                        name="Faturamento Líquido"
+                        stroke="rgb(56 189 248)" // sky-400
+                        fill="rgba(56, 189, 248, 0.18)"
+                        strokeWidth={2.6}
+                        dot={{ r: 4, fill: 'rgb(56 189 248)' }}
+                        activeDot={{ r: 6 }}
+                      />
+
+                      {/* Investimento em laranja, bem destacado */}
+                      <Line
                         type="monotone"
                         dataKey="gasto"
-                        name="Investido"
-                        stroke="rgb(245 158 11)"
-                        fill="rgba(245, 158, 11, 0.25)"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
+                        name="Investimento"
+                        stroke="rgb(249 115 22)" // orange-500
+                        strokeWidth={2.4}
+                        dot={{ r: 4, fill: 'rgb(249 115 22)' }}
+                        activeDot={{ r: 6 }}
                       />
+
+                      {/* Lucro em verde, linha tracejada elegante */}
                       <Line
-                        yAxisId="left"
                         type="monotone"
-                        dataKey="leads"
-                        name="Leads"
-                        stroke="rgb(56 189 248)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
-                      <Line
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="automacao"
-                        name="Automação"
-                        stroke="rgb(168 85 247)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
-                      <Line
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="vendas"
-                        name="Vendas"
-                        stroke="rgb(16 185 129)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
+                        dataKey="lucro"
+                        name="Lucro"
+                        stroke="rgb(34 197 94)" // green-500
+                        strokeWidth={2.4}
+                        dot={{ r: 4, fill: 'rgb(34 197 94)' }}
+                        activeDot={{ r: 6 }}
+                        strokeDasharray="4 4"
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                    Sem dados suficientes para exibir.
+                    Sem dados suficientes para exibir o gráfico
                   </div>
                 )}
               </div>
+              </div>
             </div>
 
-            {/* Gráficos principais */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ETAPA 3: Métricas de Tráfego */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-orange-500 to-orange-600 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconMegaphone className="w-6 h-6 text-orange-400" />
+                    Métricas de Tráfego
+                  </h2>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Investimento</p>
+                  <p className="text-white text-lg font-bold">
+                    {amountSpentTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Leads</p>
+                  <p className="text-white text-lg font-bold">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">CPL</p>
+                  <p className="text-white text-lg font-bold">
+                    {cpl !== null ? cpl.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Vendas</p>
+                  <p className="text-white text-lg font-bold">{filteredVendas.length}</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Custo por Venda</p>
+                  <p className="text-white text-lg font-bold">
+                    {custoPorVenda !== null ? custoPorVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Lead → Checkout</p>
+                  <p className="text-white text-lg font-bold">
+                    {leadToAutomationRateValue !== null ? `${leadToAutomationRateValue.toFixed(1)}%` : 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Checkout → Venda</p>
+                  <p className="text-white text-lg font-bold">
+                    {automationToSaleRateValue !== null ? `${automationToSaleRateValue.toFixed(1)}%` : 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Lead → Venda</p>
+                  <p className="text-white text-lg font-bold">
+                    {leadToSaleRateValue !== null ? `${leadToSaleRateValue.toFixed(1)}%` : 'N/A'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Alcance</p>
+                  <p className="text-white text-lg font-bold">
+                    {totalReach > 0 ? totalReach.toLocaleString('pt-BR') : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Impressões</p>
+                  <p className="text-white text-lg font-bold">
+                    {totalImpressions > 0 ? totalImpressions.toLocaleString('pt-BR') : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Cliques</p>
+                  <p className="text-white text-lg font-bold">
+                    {totalClicks > 0 ? totalClicks.toLocaleString('pt-BR') : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">CTR</p>
+                  <p className="text-white text-lg font-bold">
+                    {avgCTR > 0 ? `${avgCTR.toFixed(2)}%` : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">CPC</p>
+                  <p className="text-white text-lg font-bold">
+                    {avgCPC > 0 ? avgCPC.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">CPM</p>
+                  <p className="text-white text-lg font-bold">
+                    {cpm !== null && cpm > 0 ? cpm.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Frequência</p>
+                  <p className="text-white text-lg font-bold">
+                    {avgFrequency > 0 ? avgFrequency.toFixed(2) : 'N/D'}
+                  </p>
+                </div>
+                <div className="bg-slate-800/60 rounded-lg border border-slate-700/60 p-5 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                  <p className="text-slate-400 text-xs mb-1">Visualizações Página</p>
+                  <p className="text-white text-lg font-bold">
+                    {totalLandingPageViews > 0 ? totalLandingPageViews.toLocaleString('pt-BR') : 'N/D'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+
+            {/* Gráficos de Vendas */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-indigo-500 to-indigo-600 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconCart className="w-6 h-6 text-indigo-400" />
+                    Análise de Vendas
+                  </h2>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Vendas por Plano */}
               <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-white font-semibold">Vendas por Plano</h3>
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/40">
+                  <h3 className="text-white font-semibold text-lg">Vendas por Plano</h3>
                   <div className="flex gap-3">
                     {vendasPorPlanoExibir.map(([plano, count], i) => (
                       <span key={plano} className="flex items-center gap-1.5 text-xs">
@@ -1955,110 +2328,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Rankings de performance */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {rankingConfigs.map((config) => (
-                <div key={config.title} className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-semibold">Ranking de {config.title}</h3>
-                    <span className="text-slate-500 text-xs">Valores filtrados</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-emerald-300 text-xs font-semibold uppercase tracking-wide">
-                        {config.topLabel}
-                      </p>
-                      <div className="mt-2 space-y-3">
-                        {config.top.length > 0 ? config.top.map((item, idx) => (
-                          <div
-                            key={`${config.title}-top-${item.nome || idx}`}
-                            className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-white text-sm font-semibold truncate">{item.nome || '—'}</p>
-                              <span className="text-emerald-300 text-xs font-semibold">{formatPercent(item.roi)}</span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
-                              <span>Vendas: <span className="text-white font-semibold">{item.vendas}</span></span>
-                              <span>Gasto: <span className="text-white font-semibold">{formatCurrency(item.gasto, 0)}</span></span>
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                              <span>CPL {formatCurrency(item.cpl)}</span>
-                              <span>CPA {formatCurrency(item.cpa)}</span>
-                            </div>
-                          </div>
-                        )) : (
-                          <p className="text-slate-500 text-sm py-4">Sem dados disponíveis.</p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-amber-300 text-xs font-semibold uppercase tracking-wide">
-                        {config.bottomLabel}
-                      </p>
-                      <div className="mt-2 space-y-3">
-                        {config.bottom.length > 0 ? config.bottom.map((item, idx) => (
-                          <div
-                            key={`${config.title}-bottom-${item.nome || idx}`}
-                            className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-white text-sm font-semibold truncate">{item.nome || '—'}</p>
-                              <span className="text-amber-300 text-xs font-semibold">
-                                {item.roi !== null && item.roi !== undefined ? formatPercent(item.roi) : '—'}
-                              </span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
-                              <span>Vendas: <span className="text-white font-semibold">{item.vendas}</span></span>
-                              <span>Gasto: <span className="text-white font-semibold">{formatCurrency(item.gasto, 0)}</span></span>
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                              <span>CPL {formatCurrency(item.cpl)}</span>
-                              <span>CPA {formatCurrency(item.cpa)}</span>
-                            </div>
-                          </div>
-                        )) : (
-                          <p className="text-slate-500 text-sm py-4">Sem dados disponíveis.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Checkout e Top Campanhas */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Checkout */}
-              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <h3 className="text-white font-semibold mb-4">Vendas por Checkout</h3>
-                <div className="space-y-3">
-                  {Object.entries(vendasPorCheckout).map(([checkout, count], i) => {
-                    const total = Object.values(vendasPorCheckout).reduce((a, b) => a + b, 0);
-                    const percent = total > 0 ? (count / total) * 100 : 0;
-                    return (
-                      <div key={checkout} className="group">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-slate-300 text-sm font-medium">{checkout}</span>
-                          <span className="text-white font-semibold">{count}</span>
-                        </div>
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-gradient-to-r from-sky-500 to-sky-400' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {Object.keys(vendasPorCheckout).length === 0 && <p className="text-slate-500 text-sm text-center py-4">Nenhuma venda</p>}
-                </div>
-              </div>
-
+            {/* Top Campanhas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Top Campanhas */}
               <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-semibold">Top Campanhas</h3>
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/40">
+                  <h3 className="text-white font-semibold text-lg">Top Campanhas</h3>
                   {melhorAnuncio && (
                     <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
                       Melhor: {melhorAnuncio.vendas} vendas
@@ -2091,160 +2366,23 @@ export default function DashboardPage() {
                 </div>
                 {Object.keys(vendasPorCampanha).length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nenhuma campanha com vendas</p>}
               </div>
-            </div>
-
-            {/* Segmentação por origem e dispositivo */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-white font-semibold">Origem dos leads</h3>
-                    <p className="text-slate-500 text-sm">Leads, vendas e investimento por canal</p>
-                  </div>
-                  <span className="text-xs text-slate-500">utm_source</span>
-                </div>
-                <div className="h-72">
-                  {topOrigens.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart
-                        layout="vertical"
-                        data={topOrigens.map((item) => ({
-                          label: item.label,
-                          Leads: item.leads,
-                          Vendas: item.vendas,
-                          Investido: item.gasto,
-                        }))}
-                        margin={{ top: 8, right: 32, left: 0, bottom: 8 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" horizontal={false} />
-                        <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="label" width={140} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                        <Tooltip
-                          formatter={(value: any, name: any) => {
-                            if (name === 'Investido') {
-                              return [formatCurrency(Number(value), 0), 'Investido'];
-                            }
-                            return [Number(value).toLocaleString('pt-BR'), name];
-                          }}
-                        />
-                        <Legend formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>} />
-                        <Bar dataKey="Leads" fill="rgb(56 189 248)" barSize={18} radius={[0, 6, 6, 0]} />
-                        <Bar dataKey="Vendas" fill="rgb(16 185 129)" barSize={18} radius={[0, 6, 6, 0]} />
-                        <Line
-                          dataKey="Investido"
-                          stroke="rgb(245 158 11)"
-                          strokeWidth={2}
-                          dot={{ r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                      Sem dados de origem.
-                    </div>
-                  )}
-                </div>
-                {topOrigens.length > 0 && (
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-400">
-                    {topOrigens.slice(0, 4).map((item) => (
-                      <div key={`origem-summary-${item.label}`} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
-                        <p className="text-white text-sm font-semibold mb-1 truncate">{item.label}</p>
-                        <div className="flex items-center justify-between">
-                          <span>Leads</span>
-                          <span className="text-white font-semibold">{item.leads.toLocaleString('pt-BR')}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Vendas</span>
-                          <span className="text-emerald-300 font-semibold">{item.vendas.toLocaleString('pt-BR')}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Investido</span>
-                          <span className="text-amber-300 font-semibold">{formatCurrency(item.gasto, 0)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-white font-semibold">Dispositivos</h3>
-                    <p className="text-slate-500 text-sm">Distribuição de leads por dispositivo</p>
-                  </div>
-                  <span className="text-xs text-slate-500">device</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                  <div className="h-64">
-                    {topDevices.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={topDevices.map((item) => ({
-                              name: item.label,
-                              value: item.leads,
-                            }))}
-                            innerRadius={45}
-                            outerRadius={70}
-                            paddingAngle={4}
-                            dataKey="value"
-                          >
-                            {topDevices.map((_, idx) => (
-                              <Cell
-                                key={`device-slice-${idx}`}
-                                fill={['#0ea5e9', '#22c55e', '#a855f7', '#f97316', '#eab308'][idx % 5]}
-                                stroke="rgb(15 23 42)"
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            formatter={(value: any) => Number(value).toLocaleString('pt-BR')}
-                            labelFormatter={(label: any) => label}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                        Sem dados de dispositivo.
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {topDevices.map((item) => {
-                      const percent = totalDeviceLeads > 0 ? (item.leads / totalDeviceLeads) * 100 : 0;
-                      return (
-                        <div key={`device-${item.label}`} className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-white text-sm font-semibold">{item.label}</p>
-                            <span className="text-slate-400 text-xs">{percent.toFixed(1)}%</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>Leads</span>
-                            <span className="text-white font-semibold">{item.leads.toLocaleString('pt-BR')}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>Automação</span>
-                            <span className="text-purple-300 font-semibold">{item.automacao.toLocaleString('pt-BR')}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>Vendas</span>
-                            <span className="text-emerald-300 font-semibold">{item.vendas.toLocaleString('pt-BR')}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {topDevices.length === 0 && (
-                      <p className="text-slate-500 text-sm">Sem dados de dispositivo.</p>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Funil do Quiz - Design Premium */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800/95 to-slate-900 border border-slate-700/60 shadow-2xl">
+            {/* Funil do Quiz */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-sky-500 to-emerald-500 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconChart className="w-6 h-6 text-sky-400" />
+                    Funil do Quiz
+                  </h2>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800/95 to-slate-900 border border-slate-700/60 shadow-2xl">
               {/* Background pattern */}
               <div className="absolute inset-0 opacity-5">
                 <div className="absolute inset-0" style={{
@@ -2265,12 +2403,12 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 px-4 py-3">
-                      <p className="text-slate-400 text-xs mb-1">Leads iniciaram</p>
+                    <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 px-5 py-4 shadow-lg">
+                      <p className="text-slate-400 text-xs mb-1.5">Leads iniciaram</p>
                       <p className="text-white text-2xl font-bold">{quizFunnelData[0]?.value?.toLocaleString('pt-BR') || 0}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/40 rounded-xl px-4 py-3">
-                      <p className="text-emerald-300 text-xs mb-1">Taxa de conclusão</p>
+                    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/40 rounded-xl px-5 py-4 shadow-lg shadow-emerald-500/20">
+                      <p className="text-emerald-300 text-xs mb-1.5">Taxa de conclusão</p>
                       <p className="text-white text-2xl font-bold">
                         {quizFunnelData.length > 1 && quizFunnelData[0].value > 0
                           ? ((quizFunnelData[quizFunnelData.length - 1].value / quizFunnelData[0].value) * 100).toFixed(1)
@@ -2494,6 +2632,210 @@ export default function DashboardPage() {
                   </div>
                 );
               })()}
+              </div>
+            </div>
+
+            {/* ETAPA 5: Métricas do Quiz - Análise Detalhada */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-gradient-to-b from-purple-500 to-purple-600 rounded-full"></div>
+                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+                    <IconChart className="w-6 h-6 text-purple-400" />
+                    Análise do Questionário
+                  </h2>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
+              </div>
+              
+              {/* Métricas Gerais do Quiz */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/60 p-8 shadow-xl">
+                <h3 className="text-white font-semibold text-lg mb-6 pb-4 border-b border-slate-700/40">Visão Geral do Funil</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-700/50 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                    <p className="text-slate-400 text-xs mb-1">Iniciaram</p>
+                    <p className="text-white text-2xl font-bold">{filteredPagina1.length.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-700/50 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                    <p className="text-slate-400 text-xs mb-1">Viraram Lead</p>
+                    <p className="text-white text-2xl font-bold">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
+                    <p className="text-emerald-400 text-xs mt-1">
+                      {filteredPagina1.length > 0 ? ((filteredLeadsCount / filteredPagina1.length) * 100).toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-700/50 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                    <p className="text-slate-400 text-xs mb-1">Viram Preço</p>
+                    <p className="text-white text-2xl font-bold">{filteredZaiaCount.toLocaleString('pt-BR')}</p>
+                    <p className="text-emerald-400 text-xs mt-1">
+                      {filteredLeadsCount > 0 ? ((filteredZaiaCount / filteredLeadsCount) * 100).toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-700/50 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                    <p className="text-slate-400 text-xs mb-1">Geraram Checkout</p>
+                    <p className="text-white text-2xl font-bold">{filteredLeadsAutomacaoCount.toLocaleString('pt-BR')}</p>
+                    <p className="text-emerald-400 text-xs mt-1">
+                      {filteredLeadsCount > 0 ? ((filteredLeadsAutomacaoCount / filteredLeadsCount) * 100).toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-700/50 shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                    <p className="text-slate-400 text-xs mb-1">Compraram</p>
+                    <p className="text-white text-2xl font-bold">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
+                    <p className="text-emerald-400 text-xs mt-1">
+                      {filteredLeadsAutomacaoCount > 0 ? ((filteredPurchasedCount / filteredLeadsAutomacaoCount) * 100).toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/40 rounded-lg p-4">
+                    <p className="text-emerald-300 text-xs mb-1">Lead → Compra</p>
+                    <p className="text-white text-2xl font-bold">
+                      {leadToSaleRateValue !== null ? `${leadToSaleRateValue.toFixed(1)}%` : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Análise por Pergunta do Quiz */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/60 p-8 shadow-xl">
+                <h3 className="text-white font-semibold text-lg mb-6 pb-4 border-b border-slate-700/40">Análise por Pergunta</h3>
+                <div className="space-y-4">
+                  {(() => {
+                    // Mapear as perguntas do quiz com os índices de coluna (baseado em quizSteps)
+                    const quizQuestions = [
+                      { 
+                        pergunta: 'Gênero', 
+                        colIdx: 2,
+                        key: 'genero'
+                      },
+                      { 
+                        pergunta: 'Treinos/semana', 
+                        colIdx: 3,
+                        key: 'treinos'
+                      },
+                      { 
+                        pergunta: 'Já usou apps', 
+                        colIdx: 4,
+                        key: 'apps'
+                      },
+                      { 
+                        pergunta: 'Contato (nome)', 
+                        colIdx: 5,
+                        key: 'nome'
+                      },
+                      { 
+                        pergunta: 'Peso (kg)', 
+                        colIdx: 8,
+                        key: 'peso'
+                      },
+                      { 
+                        pergunta: 'Altura (cm)', 
+                        colIdx: 9,
+                        key: 'altura'
+                      },
+                      { 
+                        pergunta: 'Data de Nascimento', 
+                        colIdx: 11,
+                        key: 'nascimento'
+                      },
+                      { 
+                        pergunta: 'Objetivo', 
+                        colIdx: 15,
+                        key: 'objetivo'
+                      },
+                      { 
+                        pergunta: 'Obstáculos', 
+                        colIdx: 18,
+                        key: 'obstaculos'
+                      },
+                      { 
+                        pergunta: 'Tipo de dieta', 
+                        colIdx: 19,
+                        key: 'tipoDieta'
+                      },
+                      { 
+                        pergunta: 'Conquistas desejadas', 
+                        colIdx: 20,
+                        key: 'conquistas'
+                      },
+                    ];
+
+                    return quizQuestions.map(({ pergunta, colIdx, key }) => {
+                      if (colIdx < 0) return null;
+                      
+                      // Agrupar respostas
+                      const respostaMap = new Map<string, number>();
+                      filteredPagina1.forEach(row => {
+                        const resposta = String(row[colIdx] ?? '').trim();
+                        if (resposta) {
+                          respostaMap.set(resposta, (respostaMap.get(resposta) || 0) + 1);
+                        }
+                      });
+
+                      const respostas = Array.from(respostaMap.entries())
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5); // Top 5 respostas
+
+                      if (respostas.length === 0) return null;
+
+                      const total = respostas.reduce((sum, [, count]) => sum + count, 0);
+
+                      const isExpanded = expandedQuestions[key] || false;
+                      const totalRespostas = respostaMap.size;
+
+                      return (
+                        <div key={key} className="bg-slate-900/40 rounded-xl border border-slate-700/50 overflow-hidden shadow-md hover:shadow-lg transition-all hover:border-slate-600">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedQuestions(prev => ({ ...prev, [key]: !prev[key] }))}
+                            className="w-full px-5 py-4 hover:bg-slate-800/50 transition-all flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''} p-1.5 rounded-lg group-hover:bg-purple-500/10`}>
+                                <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                              <div className="text-left">
+                                <h4 className="text-white font-semibold text-base group-hover:text-purple-300 transition-colors">{pergunta}</h4>
+                                <p className="text-slate-400 text-xs mt-1">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400/60"></span>
+                                    {totalRespostas} resposta{totalRespostas !== 1 ? 's' : ''} diferentes
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-400 text-xs">
+                              <span className="hidden sm:inline">{isExpanded ? 'Fechar' : 'Expandir'}</span>
+                            </div>
+                          </button>
+                          <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                            <div className="px-5 pb-5 pt-3 space-y-3 bg-slate-900/20">
+                              {respostas.map(([resposta, count]) => {
+                                const porcentagem = ((count / total) * 100).toFixed(1);
+                                return (
+                                  <div key={resposta} className="group">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-slate-300 text-sm font-medium truncate group-hover:text-white transition-colors">{resposta}</span>
+                                      <span className="text-slate-400 text-xs ml-3 font-medium">
+                                        <span className="text-white">{count}</span> ({porcentagem}%)
+                                      </span>
+                                    </div>
+                                    <div className="h-2.5 rounded-full bg-slate-800/80 overflow-hidden border border-slate-700/30 shadow-inner">
+                                      <div 
+                                        className="h-full bg-gradient-to-r from-purple-500 via-purple-400 to-purple-500 rounded-full transition-all duration-700 ease-out group-hover:shadow-lg group-hover:shadow-purple-500/30"
+                                        style={{ width: `${porcentagem}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }).filter(Boolean);
+                  })()}
+                </div>
+              </div>
             </div>
           </section>
         )}

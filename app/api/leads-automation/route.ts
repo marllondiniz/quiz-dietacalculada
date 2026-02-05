@@ -263,44 +263,105 @@ function extractHublaData(body: any): DetectedEventData['data'] {
   // Valor bruto: invoice, payment, event, body.data e body (Hubla pode enviar em data.amount, data.total, valor_bruto, etc.)
   const invoiceTotalCents =
     invoice.amount?.totalCents ?? invoice.amount?.total_cents ?? invoice.amount?.total ?? undefined;
+  
+  // Se invoiceTotalCents existe, está em CENTAVOS - converter para REAIS antes de usar
+  const invoiceTotalReais = invoiceTotalCents != null && parseNum(invoiceTotalCents) != null 
+    ? (parseNum(invoiceTotalCents) as number) / 100 
+    : undefined;
+  
   const grossValueRaw =
-    invoiceTotalCents ??
+    invoiceTotalReais ??
     invoice.total ?? invoice.amount ?? invoice.value ??
     payment.amount ?? payment.value ?? payment.total ??
     event.amount ?? event.total ?? event.value ??
     data.amount ?? data.total ?? data.value ?? data.valor_bruto ?? data.valorBruto ??
     body.amount ?? body.total ?? body.value ?? body.valor_bruto ?? body.valorBruto;
   let grossValue = parseNum(grossValueRaw);
-  // Se valor vier em centavos (ex.: 9700 para R$ 97,00), converter
+  
+  // Se valor vier em centavos (ex.: 9700 para R$ 97,00), converter para reais
+  // Verifica se parece ser centavos: inteiro entre 1000 e 1000000 que, dividido por 100, resulta em valor razoável
   if (grossValue != null && grossValue > 1000 && grossValue < 1000000 && Number.isInteger(grossValue)) {
     const asReais = grossValue / 100;
-    if (asReais >= 10 && asReais <= 500) grossValue = asReais;
-  }
-
-  // Valor líquido: netAmount, net_amount, valor_liquido; ou calcular: bruto - taxas
-  const receiverTotalCents =
-    Array.isArray(invoice.receivers) && invoice.receivers.length > 0
-      ? (invoice.receivers[0]?.totalCents ?? invoice.receivers[0]?.total_cents)
-      : undefined;
-  let netValueRaw =
-    receiverTotalCents ??
-    invoice.netAmount ?? invoice.net_amount ?? invoice.netValue ??
-    payment.netAmount ?? payment.net_amount ?? payment.netValue ?? payment.net_value ??
-    event.netAmount ?? event.net_amount ?? event.netValue ?? event.net_value ??
-    data.netAmount ?? data.net_amount ?? data.netValue ?? data.valor_liquido ?? data.valorLiquido ??
-    body.netAmount ?? body.net_amount ?? body.netValue ?? body.valor_liquido ?? body.valorLiquido;
-  let netValue = parseNum(netValueRaw);
-  if (netValue == null && grossValue != null) {
-    const fees = payment.fees ?? event.fees ?? data.fees ?? body.fees;
-    if (Array.isArray(fees) && fees.length > 0) {
-      const totalFees = fees.reduce((acc: number, f: any) => acc + (parseNum(f.amount) ?? 0), 0);
-      if (totalFees > 0) netValue = Math.max(0, grossValue - totalFees);
+    // Valores típicos: entre R$ 10 e R$ 5000
+    if (asReais >= 10 && asReais <= 5000) {
+      grossValue = asReais;
     }
   }
-  if (netValue != null && netValue > 1000 && netValue < 1000000 && Number.isInteger(netValue)) {
-    const asReais = netValue / 100;
-    if (asReais >= 10 && asReais <= 500) netValue = asReais;
+
+  // Valor líquido: pegar direto do receiver do vendedor (role "seller")
+  // O valor já vem líquido (após descontar taxas da plataforma) no totalCents do seller
+  const receiverTotalCents = (() => {
+    if (!Array.isArray(invoice.receivers) || invoice.receivers.length === 0) {
+      return undefined;
+    }
+    
+    // 1. Procurar pelo ID específico da Dieta Calculada
+    const dietaCalcReceiver = invoice.receivers.find((r: any) => 
+      r.id === 'i98pEhLWL2XxVUecOrInN9Jwq7H3'
+    );
+    if (dietaCalcReceiver) {
+      return dietaCalcReceiver.totalCents ?? dietaCalcReceiver.total_cents;
+    }
+    
+    // 2. Procurar receiver com role "seller" ou paysForFees = true (vendedor)
+    const sellerReceiver = invoice.receivers.find((r: any) => 
+      r.role === 'seller' || r.role === 'producer' || r.paysForFees === true
+    );
+    if (sellerReceiver) {
+      return sellerReceiver.totalCents ?? sellerReceiver.total_cents;
+    }
+    
+    // 3. Fallback: pegar o último (geralmente é o vendedor)
+    const lastReceiver = invoice.receivers[invoice.receivers.length - 1];
+    return lastReceiver?.totalCents ?? lastReceiver?.total_cents;
+  })();
+  
+  // Converter de centavos para reais
+  let netValue = receiverTotalCents != null && parseNum(receiverTotalCents) != null
+    ? (parseNum(receiverTotalCents) as number) / 100
+    : undefined;
+  
+  // Se ainda não encontrou, tentar outras fontes (para compatibilidade com outros checkouts)
+  if (netValue == null) {
+    const netValueRaw =
+      invoice.netAmount ?? invoice.net_amount ?? invoice.netValue ??
+      payment.netAmount ?? payment.net_amount ?? payment.netValue ?? payment.net_value ??
+      event.netAmount ?? event.net_amount ?? event.netValue ?? event.net_value ??
+      data.netAmount ?? data.net_amount ?? data.netValue ?? data.valor_liquido ?? data.valorLiquido ??
+      body.netAmount ?? body.net_amount ?? body.netValue ?? body.valor_liquido ?? body.valorLiquido;
+    netValue = parseNum(netValueRaw);
+    
+    // Se valor vier em centavos, converter
+    if (netValue != null && netValue > 1000 && netValue < 1000000 && Number.isInteger(netValue)) {
+      const asReais = netValue / 100;
+      if (asReais >= 10 && asReais <= 5000) {
+        netValue = asReais;
+      }
+    }
   }
+  
+  // Garantir que valor líquido não seja maior que o bruto
+  if (netValue != null && grossValue != null && netValue > grossValue) {
+    console.warn(`⚠️ Valor líquido (${netValue}) maior que bruto (${grossValue}). Ajustando para igual ao bruto.`);
+    netValue = grossValue;
+  }
+  
+  // Log detalhado para debug de valores
+  console.log('💰 [DEBUG] Extração de valores:', {
+    // Valores brutos originais
+    invoiceTotalCents,
+    invoiceTotalReais,
+    grossValueRaw,
+    grossValueFinal: grossValue,
+    // Valores líquidos originais
+    receiverTotalCents,
+    netValueFinal: netValue,
+    // Estruturas consultadas
+    hasInvoice: !!invoice,
+    hasPayment: !!payment,
+    hasReceivers: Array.isArray(invoice.receivers) && invoice.receivers.length > 0,
+    totalReceivers: Array.isArray(invoice.receivers) ? invoice.receivers.length : 0,
+  });
 
   // Extrair forma de pagamento
   let paymentMethod = payment.method || payment.payment_method || invoice.paymentMethod || body.paymentMethod || '';
@@ -616,6 +677,13 @@ async function handleSaleApproved(
       coupon: data.coupon,
     };
 
+    console.log('📊 [DEBUG] Dados da venda antes de salvar na planilha:', {
+      grossValue: saleData.grossValue,
+      netValue: saleData.netValue,
+      plan: saleData.plan,
+      transactionId: saleData.transactionId,
+    });
+    
     const salesResult = await saveSaleToSalesSheet(saleData);
     console.log(`📊 Venda salva na aba "Lista Vendas": ${salesResult.success ? '✅' : '❌'}`);
 
