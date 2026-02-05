@@ -1,0 +1,121 @@
+{
+  "type": "invoice.payment_succeeded",
+  "event": {
+    "product": {
+      "id": "9uz9SIpLP3pZ0f12ydsD",
+      "name": "Dieta Calculada"
+    },
+    "products": [
+      {
+        "id": "9uz9SIpLP3pZ0f12ydsD",
+        "name": "Dieta Calculada",
+        "offers": [
+          {
+            "id": "9uz9SIpLP3pZ0f12ydsD",
+            "name": "Plano Anual",
+            "cohorts": [
+              {
+                "id": "f89cb7aa-f85f-4f0d-858b-1bf5001150f3"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "invoice": {
+      "id": "53a0a7ba-d2f8-4285-addd-6cdf0a937568-tester",
+      "childInvoiceIds": [],
+      "subscriptionId": "01cc18cb-5297-41a4-8410-9058c7113aab-tester",
+      "payerId": "2323",
+      "payer": {
+        "id": "2323",
+        "firstName": "Dieta",
+        "lastName": "Calculada",
+        "email": "marketing@dietacalculada.com",
+        "phone": "27992338038"
+      },
+      "sellerId": "i98pEhLWL2XxVUecOrInN9Jwq7H3",
+      "installments": 1,
+      "paymentMethod": "pix",
+      "currency": "BRL",
+      "type": "sell",
+      "status": "paid",
+      "statusAt": [
+        {
+          "status": "unpaid",
+          "when": "2026-02-05T12:54:37.037Z"
+        },
+        {
+          "status": "paid",
+          "when": "2026-02-05T12:54:37.037Z"
+        }
+      ],
+      "paymentSession": {
+        "ip": "127.0.0.1",
+        "utm": {
+          "source": "facebook",
+          "medium": "ads",
+          "campaign": "teste sandbox",
+          "content": "hubla sandbox"
+        }
+      },
+      "amount": {
+        "subtotalCents": 9900,
+        "discountCents": 0,
+        "prorataCents": 0,
+        "installmentFeeCents": 0,
+        "totalCents": 9900
+      },
+      "receivers": [
+        {
+          "id": "platform-identity",
+          "name": "Hubla Tecnologia LTDA",
+          "email": "suporte@hub.la",
+          "phone": "+5531999715693",
+          "role": "platform",
+          "paysForFees": false,
+          "totalCents": 783
+        },
+        {
+          "id": "i98pEhLWL2XxVUecOrInN9Jwq7H3",
+          "email": "dietacalculadaoficial@gmail.com",
+          "phone": "+5527992866320",
+          "role": "seller",
+          "paysForFees": true,
+          "totalCents": 9118
+        }
+      ],
+      "saleDate": "2026-02-05T12:54:37.037Z",
+      "dueDate": "2026-02-05T12:54:37.037Z",
+      "createdAt": "2026-02-05T12:54:37.037Z",
+      "modifiedAt": "2026-02-05T12:54:37.037Z",
+      "version": 1,
+      "billingAddress": {
+        "countryCode": "BR",
+        "state": "São Paulo",
+        "city": "São Paulo",
+        "neighborhood": "Sumarezinho",
+        "street": "Rua Sen Cesar Lacerda Vergueiro",
+        "complement": "Sala 61 e 62",
+        "number": "380",
+        "postalCode": "05435-010"
+      }
+    },
+    "subscriptions": [
+      {
+        "id": "01cc18cb-5297-41a4-8410-9058c7113aab-tester",
+        "type": "one_time",
+        "billingCycleMonths": 1,
+        "quantity": 1
+      }
+    ],
+    "user": {
+      "id": "RE4gy1p6uehKiXh4Ul4Jk-tester",
+      "firstName": "Test",
+      "lastName": "User Name",
+      "email": "test-user-email@example.com",
+      "phone": "+5511999999999"
+    }
+  },
+  "version": "2.0.0"
+}

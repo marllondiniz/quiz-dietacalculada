@@ -66,7 +66,10 @@ async function fetchSheet(
   });
   const values = response.data.values || [];
   const headers = values[0] || [];
-  const rows = values.slice(1);
+  const rows = values.slice(1); // Remove a primeira linha (header)
+  
+  console.log(`[Dashboard] ${sheetName || 'Primeira aba'}: ${values.length} linhas total, ${rows.length} linhas de dados (headers removidos)`);
+  
   return {
     headers,
     rows,

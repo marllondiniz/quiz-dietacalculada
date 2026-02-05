@@ -857,14 +857,25 @@ function mapOfferName(plan?: string, offerName?: string): string {
  */
 export function buildSalesRow(saleData: SaleData): string[] {
   const now = new Date().toISOString();
+  
+  const grossFormatted = formatCurrency(saleData.grossValue);
+  const netFormatted = formatCurrency(saleData.netValue);
+  
+  console.log('📋 [DEBUG] buildSalesRow - Formatação de valores:', {
+    grossValue: saleData.grossValue,
+    netValue: saleData.netValue,
+    grossFormatted,
+    netFormatted,
+  });
+  
   return [
     formatDateBR(saleData.purchaseDate || now),      // A  DATA COMPRA
     formatDateBR(saleData.paymentDate || now),       // B  DATA PAGAMENTO
     saleData.checkout.toUpperCase(),                 // C  CHECKOUT
     saleData.transactionId ?? '',                    // D  ID TRANSAÇÃO
     mapPlanName(saleData.plan),                      // E  PLANO
-    formatCurrency(saleData.grossValue),             // F  VALOR BRUTO
-    formatCurrency(saleData.netValue),               // G  VALOR LÍQUIDO
+    grossFormatted,                                  // F  VALOR BRUTO
+    netFormatted,                                    // G  VALOR LÍQUIDO
     saleData.paymentMethod ?? '',                    // H  FORMA DE PAGAMENTO
     saleData.name ?? '',                             // I  NOME
     saleData.email ?? '',                            // J  E-MAIL
