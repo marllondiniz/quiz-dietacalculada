@@ -14,6 +14,7 @@ export const AUTOMATION_COLUMNS = {
   zaia_sent: 'G',
   checkout_source: 'H',
   purchase_at: 'I',
+  recovery_msg01_sent_at: 'J',
 };
 
 // Índices das colunas (0-based)
@@ -27,6 +28,7 @@ export const COLUMN_INDEXES = {
   zaia_sent: 6,
   checkout_source: 7,
   purchase_at: 8,
+  recovery_msg01_sent_at: 9,
 };
 
 // Interface para o lead
@@ -40,6 +42,7 @@ export interface AutomationLead {
   zaia_sent: boolean;
   checkout_source: string;
   purchase_at: string;
+  recovery_msg01_sent_at: string;
 }
 
 // Tipo para checkout source
@@ -84,6 +87,7 @@ export const AUTOMATION_HEADERS = [
   'zaia_sent',
   'checkout_source',
   'purchase_at',
+  'recovery_msg01_sent_at',
 ];
 
 /**
@@ -125,16 +129,16 @@ export async function ensureAutomationSheetExists(): Promise<void> {
   try {
     const headerRow = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
+      range: `${AUTOMATION_SHEET_NAME}!A1:J1`,
     });
 
     const existingHeaders = headerRow.data.values?.[0] || [];
     
-    // Se não tem headers ou está incompleto, adicionar
-    if (existingHeaders.length === 0 || existingHeaders[0] !== 'lead_id') {
+    // Se não tem headers ou está incompleto, adicionar/atualizar
+    if (existingHeaders.length === 0 || existingHeaders[0] !== 'lead_id' || existingHeaders.length < AUTOMATION_HEADERS.length) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
+        range: `${AUTOMATION_SHEET_NAME}!A1:J1`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [AUTOMATION_HEADERS],
@@ -145,7 +149,7 @@ export async function ensureAutomationSheetExists(): Promise<void> {
     // Se der erro ao ler, provavelmente a aba está vazia, adicionar headers
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${AUTOMATION_SHEET_NAME}!A1:I1`,
+      range: `${AUTOMATION_SHEET_NAME}!A1:J1`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [AUTOMATION_HEADERS],
@@ -164,7 +168,7 @@ export async function getAllLeads(): Promise<AutomationLead[]> {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
   });
 
   const rows = response.data.values || [];
@@ -184,6 +188,7 @@ export async function getAllLeads(): Promise<AutomationLead[]> {
     zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
     checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
     purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
+    recovery_msg01_sent_at: row[COLUMN_INDEXES.recovery_msg01_sent_at] || '',
   }));
 }
 
@@ -201,7 +206,7 @@ export async function findLeadByEmailOrPhone(
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
   });
 
   const rows = response.data.values || [];
@@ -223,8 +228,9 @@ export async function findLeadByEmailOrPhone(
           created_at: row[COLUMN_INDEXES.created_at] || '',
           purchased: row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true',
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
-              checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
+          recovery_msg01_sent_at: row[COLUMN_INDEXES.recovery_msg01_sent_at] || '',
         },
         rowIndex: i + 1, // +1 porque a planilha é 1-indexed
       };
@@ -243,6 +249,7 @@ export async function findLeadByEmailOrPhone(
           zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
           checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: row[COLUMN_INDEXES.purchase_at] || '',
+          recovery_msg01_sent_at: row[COLUMN_INDEXES.recovery_msg01_sent_at] || '',
         },
         rowIndex: i + 1,
       };
@@ -418,11 +425,12 @@ export async function upsertLead(data: {
     'false',                      // zaia_sent
     data.checkout_source || '',   // checkout_source
     '',                           // purchase_at
+    '',                           // recovery_msg01_sent_at
   ];
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
     valueInputOption: 'RAW',
     insertDataOption: 'INSERT_ROWS',
     requestBody: {
@@ -520,7 +528,7 @@ export async function markAllLeadsWithPhoneAsZaiaSent(phone: string): Promise<vo
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
   });
 
   const rows = response.data.values || [];
@@ -563,7 +571,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${AUTOMATION_SHEET_NAME}!A:I`,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
   });
 
   const rows = response.data.values || [];
@@ -610,6 +618,7 @@ export async function getAbandonedLeads(minutesThreshold: number = 5): Promise<
           zaia_sent: false,
           checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
           purchase_at: '',
+          recovery_msg01_sent_at: row[COLUMN_INDEXES.recovery_msg01_sent_at] || '',
         };
 
         // Só incluir se tiver FirstName e phone (obrigatórios para Zaia)
@@ -681,6 +690,228 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
     return true;
   } catch (error: any) {
     console.error('❌ Erro ao enviar para Zaia:', error.message);
+    return false;
+  }
+}
+
+// ==========================================
+// RECUPERAÇÃO DE QUIZ VIA WHATSAPP
+// ==========================================
+
+/**
+ * Busca leads elegíveis para mensagem de recuperação do quiz
+ * 
+ * Critérios:
+ * - purchased = false (não comprou)
+ * - recovery_msg01_sent_at está vazio (não recebeu a mensagem)
+ * - created_at >= 20 minutos atrás (tempo mínimo para enviar)
+ * - Tem FirstName e phone válidos
+ * 
+ * @param minutesThreshold - Tempo mínimo em minutos desde a criação (padrão: 20)
+ * @returns Array de leads elegíveis com índice da linha
+ */
+export async function getLeadsForRecoveryMessage(
+  minutesThreshold: number = 20
+): Promise<Array<{ lead: AutomationLead; rowIndex: number }>> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+
+  await ensureAutomationSheetExists();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
+  });
+
+  const rows = response.data.values || [];
+  const now = new Date();
+  const eligibleLeads: Array<{ lead: AutomationLead; rowIndex: number }> = [];
+  const processedPhones = new Set<string>();
+
+  console.log(`🔍 Buscando leads para recuperação (threshold: ${minutesThreshold} min)...`);
+
+  // Pular header
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    
+    const purchased = row[COLUMN_INDEXES.purchased]?.toLowerCase() === 'true';
+    const recoveryMsgSent = row[COLUMN_INDEXES.recovery_msg01_sent_at] || '';
+    const createdAt = row[COLUMN_INDEXES.created_at];
+    const phone = row[COLUMN_INDEXES.phone] || '';
+    const firstName = row[COLUMN_INDEXES.FirstName] || '';
+
+    // Normalizar telefone para comparação
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    // Pular se já comprou
+    if (purchased) {
+      continue;
+    }
+
+    // Pular se já recebeu a mensagem de recuperação
+    if (recoveryMsgSent) {
+      continue;
+    }
+
+    // Pular se já processamos este telefone (evitar duplicatas)
+    if (normalizedPhone && processedPhones.has(normalizedPhone)) {
+      continue;
+    }
+
+    // Pular se não tem nome ou telefone
+    if (!firstName || !phone) {
+      continue;
+    }
+
+    // Verificar se o telefone é válido (mínimo 10 dígitos)
+    if (normalizedPhone.length < 10) {
+      continue;
+    }
+
+    // Verificar se passou tempo suficiente desde a criação
+    if (createdAt) {
+      const createdDate = new Date(createdAt);
+      const diffMs = now.getTime() - createdDate.getTime();
+      const diffMinutes = diffMs / (1000 * 60);
+
+      if (diffMinutes >= minutesThreshold) {
+        const lead: AutomationLead = {
+          lead_id: row[COLUMN_INDEXES.lead_id] || '',
+          FirstName: firstName,
+          email: row[COLUMN_INDEXES.email] || '',
+          phone: phone,
+          created_at: createdAt,
+          purchased: false,
+          zaia_sent: row[COLUMN_INDEXES.zaia_sent]?.toLowerCase() === 'true',
+          checkout_source: (row[COLUMN_INDEXES.checkout_source] || '') as string,
+          purchase_at: '',
+          recovery_msg01_sent_at: '',
+        };
+
+        eligibleLeads.push({
+          lead,
+          rowIndex: i + 1, // 1-indexed
+        });
+        
+        // Marcar telefone como processado (evitar duplicatas)
+        if (normalizedPhone) {
+          processedPhones.add(normalizedPhone);
+        }
+      }
+    }
+  }
+
+  console.log(`✅ ${eligibleLeads.length} lead(s) elegível(is) para recuperação`);
+
+  return eligibleLeads;
+}
+
+/**
+ * Marca lead como tendo recebido a mensagem de recuperação
+ * 
+ * @param rowIndex - Índice da linha na planilha (1-based)
+ */
+export async function markLeadAsRecoverySent(rowIndex: number): Promise<void> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  
+  const timestamp = generateISOTimestamp();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${AUTOMATION_SHEET_NAME}!${AUTOMATION_COLUMNS.recovery_msg01_sent_at}${rowIndex}`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[timestamp]],
+    },
+  });
+
+  console.log(`✅ Lead marcado como recuperação enviada (linha ${rowIndex})`);
+}
+
+/**
+ * Marca TODOS os leads com o mesmo telefone como recovery_msg01_sent
+ * Evita envios duplicados para o mesmo número
+ * 
+ * @param phone - Número de telefone
+ */
+export async function markAllLeadsWithPhoneAsRecoverySent(phone: string): Promise<void> {
+  const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
+  const normalizedPhone = phone.replace(/\D/g, '');
+  const timestamp = generateISOTimestamp();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${AUTOMATION_SHEET_NAME}!A:J`,
+  });
+
+  const rows = response.data.values || [];
+  const updates: { range: string; values: string[][] }[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rowPhone = (row[COLUMN_INDEXES.phone] || '').replace(/\D/g, '');
+    const recoveryMsgSent = row[COLUMN_INDEXES.recovery_msg01_sent_at] || '';
+
+    if (rowPhone === normalizedPhone && !recoveryMsgSent) {
+      updates.push({
+        range: `${AUTOMATION_SHEET_NAME}!${AUTOMATION_COLUMNS.recovery_msg01_sent_at}${i + 1}`,
+        values: [[timestamp]],
+      });
+    }
+  }
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: 'RAW',
+        data: updates,
+      },
+    });
+
+    console.log(`✅ ${updates.length} lead(s) com telefone ${normalizedPhone} marcado(s) como recuperação enviada`);
+  }
+}
+
+/**
+ * Envia mensagem de recuperação do quiz via WhatsApp
+ * 
+ * @param lead - Lead para enviar a mensagem
+ * @returns true se enviado com sucesso, false caso contrário
+ */
+export async function sendRecoveryWhatsApp(lead: AutomationLead): Promise<boolean> {
+  try {
+    // Importar função do módulo WhatsApp
+    const { sendRecoveryTemplate } = await import('./whatsapp');
+
+    // Formatar telefone (garantir que tem código do país)
+    const phoneClean = lead.phone.replace(/\D/g, '');
+    let formattedPhone = phoneClean;
+    
+    // Adicionar +55 se necessário (Brasil)
+    if (!phoneClean.startsWith('55') && phoneClean.length >= 10) {
+      formattedPhone = '55' + phoneClean;
+    }
+
+    // Modo teste/dry-run
+    if ((process.env.WA_DRY_RUN || '').toLowerCase() === 'true') {
+      console.log('🧪 WA_DRY_RUN ativo — simulando envio WhatsApp:', {
+        to: formattedPhone,
+        name: lead.FirstName,
+      });
+      return true;
+    }
+
+    // Enviar template via WhatsApp
+    const response = await sendRecoveryTemplate({
+      to: formattedPhone,
+      name: lead.FirstName,
+    });
+
+    console.log(`✅ Mensagem de recuperação enviada para ${lead.FirstName} (${formattedPhone})`);
+    
+    return true;
+  } catch (error: any) {
+    console.error('❌ Erro ao enviar mensagem de recuperação:', error.message);
     return false;
   }
 }
