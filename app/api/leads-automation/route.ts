@@ -143,7 +143,8 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      cron_endpoint: '/api/leads-automation/cron',
+      cron_endpoint: '/api/leads-automation/recovery',
+      cron_description: 'Recuperação via WhatsApp (a cada 1 min, leads 5+ min sem compra)',
     });
   } catch (error: any) {
     return NextResponse.json({

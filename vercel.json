@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/leads-automation/cron",
-      "schedule": "* * * * *"
-    },
-    {
       "path": "/api/leads-automation/recovery",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }

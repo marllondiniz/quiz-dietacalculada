@@ -57,6 +57,9 @@ export async function sendRecoveryTemplate(
     throw new Error(`Número de telefone inválido: ${to} (muito curto)`);
   }
 
+  // Nome do template (permite trocar via .env quando criar novo template no Meta)
+  const templateName = process.env.WA_RECOVERY_TEMPLATE_NAME || 'msg01_recuperacao_quiz_01';
+
   // Montar URL da API
   const url = `https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`;
 
@@ -66,7 +69,7 @@ export async function sendRecoveryTemplate(
     to: cleanedPhone,
     type: 'template',
     template: {
-      name: 'msg01_recuperacao_quiz_01',
+      name: templateName,
       language: { code: 'pt_BR' },
       components: [
         {

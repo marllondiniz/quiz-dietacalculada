@@ -10,22 +10,19 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
- * CRON - Processa leads para recuperação do quiz via WhatsApp
+ * CRON - Processa leads para recuperação do quiz via WhatsApp (única automação)
  * 
- * Executado periodicamente (recomendado: a cada 5-10 minutos via Vercel Cron).
- * Envia mensagem de recuperação para leads que:
+ * Executado a cada 1 minuto via Vercel Cron.
+ * Envia mensagem de recuperação (template Sabrina) para leads que:
  * - purchased = false (não compraram)
  * - recovery_msg01_sent_at está vazio (não receberam a mensagem)
- * - created_at >= 20 minutos atrás (tempo configurável)
+ * - created_at >= 5 minutos atrás (mesma lógica que era usada na Zaia)
  * 
  * GET/POST /api/leads-automation/recovery
  * 
  * Query params:
- * - minutes: tempo mínimo em minutos desde a criação (padrão: 20)
+ * - minutes: tempo mínimo em minutos desde a criação (padrão: 5)
  * - secret: chave secreta para autorização (opcional, recomendado em produção)
- * 
- * Exemplo:
- * GET /api/leads-automation/recovery?minutes=20&secret=sua-chave-secreta
  */
 export async function GET(request: NextRequest) {
   return processRecovery(request);
@@ -48,10 +45,10 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    // Obter threshold de minutos (padrão: 20)
+    // Obter threshold de minutos (padrão: 5 — mesma lógica que era usada na Zaia)
     const minutesParam = request.nextUrl.searchParams.get('minutes');
     const minutes =
-      minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 20;
+      minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 5;
 
     console.log(`⏱️ [RECOVERY] Threshold configurado: ${minutes} minutos`);
 

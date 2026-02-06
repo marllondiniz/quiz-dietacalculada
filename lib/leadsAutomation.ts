@@ -704,14 +704,14 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
  * Critérios:
  * - purchased = false (não comprou)
  * - recovery_msg01_sent_at está vazio (não recebeu a mensagem)
- * - created_at >= 20 minutos atrás (tempo mínimo para enviar)
+ * - created_at >= N minutos atrás (padrão: 5, mesma lógica da Zaia)
  * - Tem FirstName e phone válidos
  * 
- * @param minutesThreshold - Tempo mínimo em minutos desde a criação (padrão: 20)
+ * @param minutesThreshold - Tempo mínimo em minutos desde a criação (padrão: 5)
  * @returns Array de leads elegíveis com índice da linha
  */
 export async function getLeadsForRecoveryMessage(
-  minutesThreshold: number = 20
+  minutesThreshold: number = 5
 ): Promise<Array<{ lead: AutomationLead; rowIndex: number }>> {
   const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
 
