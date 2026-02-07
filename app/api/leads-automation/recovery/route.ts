@@ -36,11 +36,20 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
   try {
     console.log('🚀 [RECOVERY] Iniciando processamento de recuperação de quiz...');
 
-    // Verificar autorização (opcional mas recomendado)
+    // Verificar autorização: Vercel envia CRON_SECRET no header Authorization (Bearer),
+    // mas também aceitamos ?secret= para testes manuais
+    const authHeader = request.headers.get('authorization');
     const secretParam = request.nextUrl.searchParams.get('secret');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && secretParam !== cronSecret) {
+    const bearerSecret = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : null;
+    const isValidSecret =
+      cronSecret &&
+      (secretParam === cronSecret || bearerSecret === cronSecret);
+
+    if (cronSecret && !isValidSecret) {
       console.error('❌ [RECOVERY] Não autorizado - secret inválido');
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
