@@ -704,18 +704,26 @@ export async function sendToZaia(lead: AutomationLead): Promise<boolean> {
  * Critérios:
  * - purchased = false (não comprou)
  * - recovery_msg01_sent_at está vazio (não recebeu a mensagem)
- * - created_at >= N minutos atrás (padrão: 5, mesma lógica da Zaia)
+ * - created_at >= N minutos atrás (padrão: 5)
+ * - created_at dentro das últimas X horas (evita retroativo; RECOVERY_MAX_AGE_HOURS, padrão 48)
  * - Tem FirstName e phone válidos
  * 
  * @param minutesThreshold - Tempo mínimo em minutos desde a criação (padrão: 5)
+ * @param maxAgeHours - Idade máxima em horas (só leads criados nas últimas X h); undefined = usar env RECOVERY_MAX_AGE_HOURS (padrão 48)
  * @returns Array de leads elegíveis com índice da linha
  */
 export async function getLeadsForRecoveryMessage(
-  minutesThreshold: number = 5
+  minutesThreshold: number = 5,
+  maxAgeHours?: number
 ): Promise<Array<{ lead: AutomationLead; rowIndex: number }>> {
   const { sheets, spreadsheetId } = await getGoogleSheetsInstance();
 
   await ensureAutomationSheetExists();
+
+  const maxHours =
+    maxAgeHours ??
+    (process.env.RECOVERY_MAX_AGE_HOURS ? Number(process.env.RECOVERY_MAX_AGE_HOURS) : 48);
+  const maxAgeMinutes = maxHours * 60;
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -727,7 +735,7 @@ export async function getLeadsForRecoveryMessage(
   const eligibleLeads: Array<{ lead: AutomationLead; rowIndex: number }> = [];
   const processedPhones = new Set<string>();
 
-  console.log(`🔍 Buscando leads para recuperação (threshold: ${minutesThreshold} min)...`);
+  console.log(`🔍 Buscando leads para recuperação (threshold: ${minutesThreshold} min, só últimos ${maxHours}h)...`);
 
   // Pular header
   for (let i = 1; i < rows.length; i++) {
@@ -767,13 +775,13 @@ export async function getLeadsForRecoveryMessage(
       continue;
     }
 
-    // Verificar se passou tempo suficiente desde a criação
+    // Janela de elegibilidade: criado há pelo menos minutesThreshold e há no máximo maxAgeHours (evita retroativo)
     if (createdAt) {
       const createdDate = new Date(createdAt);
       const diffMs = now.getTime() - createdDate.getTime();
       const diffMinutes = diffMs / (1000 * 60);
 
-      if (diffMinutes >= minutesThreshold) {
+      if (diffMinutes >= minutesThreshold && diffMinutes <= maxAgeMinutes) {
         const lead: AutomationLead = {
           lead_id: row[COLUMN_INDEXES.lead_id] || '',
           FirstName: firstName,
@@ -911,6 +919,10 @@ export async function sendRecoveryWhatsApp(lead: AutomationLead): Promise<boolea
     
     return true;
   } catch (error: any) {
+    // Erro 132015 = template pausado no Meta → repassar para o recovery abortar o lote
+    if (error?.whatsappCode === 132015) {
+      throw error;
+    }
     console.error('❌ Erro ao enviar mensagem de recuperação:', error.message);
     return false;
   }

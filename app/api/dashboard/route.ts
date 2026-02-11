@@ -11,7 +11,7 @@ const KEYS = ['pagina1', 'listaVendas', 'leadsAutomacao', 'gastosTrafico'] as co
 
 const SHEETS: Array<{ key: (typeof KEYS)[number]; name: string | null; range: string }> = [
   { key: 'pagina1', name: null, range: 'A:AK' }, // primeira aba (Quiz)
-  { key: 'listaVendas', name: 'Lista Vendas', range: 'A:R' },
+  { key: 'listaVendas', name: 'Lista Vendas', range: 'A:S' },
   { key: 'leadsAutomacao', name: 'Leads_Automacao', range: 'A:I' },
   { key: 'gastosTrafico', name: 'Gastos Tráfego', range: 'A:Z' },
 ];

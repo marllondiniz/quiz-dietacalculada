@@ -81,6 +81,9 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
     let failed = 0;
 
     // Processar cada lead
+    const TEMPLATE_PAUSED_CODE = 132015;
+    let templatePaused = false;
+
     for (const { lead, rowIndex } of eligibleLeads) {
       try {
         console.log(`📱 [RECOVERY] Processando: ${lead.FirstName} (${lead.phone})...`);
@@ -102,21 +105,37 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
           console.error(`❌ [RECOVERY] Falha ao enviar: ${lead.FirstName}`);
         }
       } catch (error: any) {
+        if (error?.whatsappCode === TEMPLATE_PAUSED_CODE) {
+          templatePaused = true;
+          console.error(
+            '❌ [RECOVERY] Template de recuperação pausado no Meta (erro 132015 - low quality). ' +
+            'Abortando lote. Reative o template no Meta ou defina WA_RECOVERY_TEMPLATE_NAME com outro template aprovado.'
+          );
+          failed = eligibleLeads.length - sent; // este + todos não processados
+          break;
+        }
         console.error(`❌ [RECOVERY] Erro ao processar ${lead.FirstName}:`, error.message);
         failed++;
       }
+
+      if (templatePaused) break;
 
       // Aguardar 200ms entre envios (rate limiting)
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
+    const maxAgeHours = process.env.RECOVERY_MAX_AGE_HOURS ? Number(process.env.RECOVERY_MAX_AGE_HOURS) : 48;
     const result = {
       success: true,
-      message: 'Processamento de recuperação concluído',
+      message: templatePaused
+        ? 'Processamento interrompido: template WhatsApp pausado no Meta (132015). Reative no Meta ou use WA_RECOVERY_TEMPLATE_NAME.'
+        : 'Processamento de recuperação concluído',
       processed: eligibleLeads.length,
       sent,
       failed,
       threshold_minutes: minutes,
+      max_age_hours: maxAgeHours,
+      ...(templatePaused && { template_paused: true }),
     };
 
     console.log('✅ [RECOVERY] Processamento concluído:', result);

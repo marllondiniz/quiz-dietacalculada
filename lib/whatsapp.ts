@@ -97,16 +97,18 @@ export async function sendRecoveryTemplate(
     const data = await response.json();
 
     if (!response.ok) {
-      // Log do erro para debug
+      const apiCode = (data as any)?.error?.code;
+      // Log do erro para debug (uma vez; 132015 será tratado no recovery para não repetir)
       console.error('❌ Erro WhatsApp API:', {
         status: response.status,
         statusText: response.statusText,
         data,
       });
-
-      throw new Error(
+      const err = new Error(
         `Erro WhatsApp API (${response.status}): ${JSON.stringify(data)}`
-      );
+      ) as Error & { whatsappCode?: number };
+      err.whatsappCode = apiCode;
+      throw err;
     }
 
     console.log(`✅ Template enviado com sucesso para ${cleanedPhone}`);
