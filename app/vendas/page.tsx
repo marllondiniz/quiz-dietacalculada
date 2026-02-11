@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-// URLs de checkout - Hubla
+// URLs de checkout - Hubla (apenas plano anual)
 const CHECKOUT_URLS = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
-    monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
   },
 };
 
@@ -340,16 +339,14 @@ function YouTubeCarousel({ videos }: { videos: string[] }) {
 
 export default function VendasPage() {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
   const plansRef = useRef<HTMLDivElement>(null);
 
   const scrollToPlans = () => {
     plansRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleCheckout = (plan: 'annual' | 'monthly') => {
-    const checkoutUrl = CHECKOUT_URLS.hubla[plan];
-    window.location.href = checkoutUrl;
+  const handleCheckout = () => {
+    window.location.href = CHECKOUT_URLS.hubla.annual;
   };
 
   return (
@@ -596,37 +593,14 @@ export default function VendasPage() {
             </p>
           </div>
 
-          {/* Plans Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-            {/* Plano Anual */}
-            <div
-              onClick={() => setSelectedPlan('annual')}
-              className={`relative bg-gray-800 rounded-3xl p-6 md:p-8 cursor-pointer transition-all duration-300 border-2 ${
-                selectedPlan === 'annual'
-                  ? 'border-[#FF911A] shadow-lg shadow-[#FF911A]/20'
-                  : 'border-gray-700 hover:border-gray-600'
-              }`}
-            >
+          {/* Plano Anual (único) */}
+          <div className="max-w-lg mx-auto">
+            <div className="relative bg-gray-800 rounded-3xl p-6 md:p-8 border-2 border-[#FF911A] shadow-lg shadow-[#FF911A]/20">
               {/* Badge Mais Popular */}
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-gradient-to-r from-[#FF911A] to-orange-500 text-white text-[11px] font-bold px-4 py-1.5 rounded-full shadow-lg uppercase tracking-wide">
                   ⭐ Mais Popular
                 </span>
-              </div>
-
-              {/* Radio Indicator */}
-              <div className="absolute top-6 right-6">
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  selectedPlan === 'annual'
-                    ? 'border-[#FF911A] bg-[#FF911A]'
-                    : 'border-gray-600'
-                }`}>
-                  {selectedPlan === 'annual' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                      <path d="M5 12l5 5L19 7"/>
-                    </svg>
-                  )}
-                </div>
               </div>
 
               <div className="mt-4">
@@ -659,65 +633,15 @@ export default function VendasPage() {
                 </ul>
               </div>
             </div>
-
-            {/* Plano Mensal */}
-            <div
-              onClick={() => setSelectedPlan('monthly')}
-              className={`relative bg-gray-800 rounded-3xl p-6 md:p-8 cursor-pointer transition-all duration-300 border-2 ${
-                selectedPlan === 'monthly'
-                  ? 'border-[#FF911A] shadow-lg shadow-[#FF911A]/20'
-                  : 'border-gray-700 hover:border-gray-600'
-              }`}
-            >
-              {/* Radio Indicator */}
-              <div className="absolute top-6 right-6">
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  selectedPlan === 'monthly'
-                    ? 'border-[#FF911A] bg-[#FF911A]'
-                    : 'border-gray-600'
-                }`}>
-                  {selectedPlan === 'monthly' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                      <path d="M5 12l5 5L19 7"/>
-                    </svg>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-2">Plano Mensal</h3>
-                
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[42px] md:text-[52px] font-extrabold text-white">R$ 30,90</span>
-                    <span className="text-[16px] text-gray-400">/mês</span>
-                  </div>
-                  <p className="text-[14px] text-gray-500">Pagamento mensal recorrente</p>
-                </div>
-
-                <ul className="space-y-3 mt-[52px]">
-                  {['Acesso completo por 1 mês', 'Suporte prioritário', 'Todas as atualizações incluídas'].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3 text-[14px] text-gray-300">
-                      <div className="w-5 h-5 rounded-full bg-[#FF911A]/20 flex items-center justify-center flex-shrink-0">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF911A" strokeWidth="3">
-                          <path d="M5 12l5 5L19 7"/>
-                        </svg>
-                      </div>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
           </div>
 
           {/* CTA Button */}
           <div className="mt-10 text-center">
             <button
-              onClick={() => handleCheckout(selectedPlan)}
+              onClick={handleCheckout}
               className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-gradient-to-r from-[#FF911A] to-orange-500 hover:from-[#e87f0f] hover:to-orange-600 text-white font-bold text-[16px] md:text-[18px] px-12 py-5 rounded-full shadow-lg shadow-[#FF911A]/30 transition-all duration-300 hover:scale-105 hover:shadow-xl"
             >
-              {selectedPlan === 'annual' ? 'GARANTIR PLANO ANUAL' : 'GARANTIR PLANO MENSAL'}
+              GARANTIR PLANO ANUAL
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
               </svg>

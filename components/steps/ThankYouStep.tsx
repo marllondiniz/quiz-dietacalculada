@@ -4,11 +4,8 @@ import { useState, useMemo } from 'react';
 import { useQuizStore, type QuizAnswers } from '@/store/quizStore';
 import { useSearchParams } from 'next/navigation';
 
-type PlanType = 'annual' | 'monthly';
-
 export default function ThankYouStep() {
   const { answers, leadId } = useQuizStore();
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
   const [isRedirecting, setIsRedirecting] = useState(false);
   const searchParams = useSearchParams();
 
@@ -48,8 +45,8 @@ export default function ThankYouStep() {
     return params;
   }, [answers, searchParams]);
 
-  // Função que chama a API de checkout split e redireciona
-  const handleCheckout = async (plan: PlanType) => {
+  // Função que chama a API de checkout split e redireciona (apenas plano anual)
+  const handleCheckout = async () => {
     if (isRedirecting) return;
     
     setIsRedirecting(true);
@@ -75,7 +72,7 @@ export default function ThankYouStep() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          plan,
+          plan: 'annual',
           utmParams,
           quizData,
         }),
@@ -96,10 +93,8 @@ export default function ThankYouStep() {
       } else {
         console.error('❌ Erro na API de checkout split:', result);
         
-        // Fallback: redirecionar para Hubla em caso de erro
-        const fallbackUrl = plan === 'annual' 
-          ? 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3'
-          : 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0';
+        // Fallback: redirecionar para Hubla (plano anual) em caso de erro
+        const fallbackUrl = 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3';
         
         console.log('🔄 Usando fallback Hubla:', fallbackUrl);
         window.location.href = fallbackUrl;
@@ -107,10 +102,8 @@ export default function ThankYouStep() {
     } catch (error) {
       console.error('❌ Erro ao processar checkout:', error);
       
-      // Fallback: redirecionar para Hubla em caso de erro
-      const fallbackUrl = plan === 'annual' 
-        ? 'https://pay.hub.la/9uz9SIpLP3pZ0f12ydsD'
-        : 'https://pay.hub.la/QnE0thkRCtKbXLmS5yPy';
+      // Fallback: redirecionar para Hubla (plano anual) em caso de erro
+      const fallbackUrl = 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3';
       
       console.log('🔄 Usando fallback Hubla:', fallbackUrl);
       window.location.href = fallbackUrl;
@@ -130,40 +123,17 @@ export default function ThankYouStep() {
             
             {/* Subtítulo */}
             <p className="text-[13px] md:text-[15px] text-gray-600 mb-4 md:mb-6 text-center">
-              Seu plano personalizado está pronto. Escolha a melhor opção para você:
+              Seu plano personalizado está pronto. Confirme abaixo e garanta seu acesso:
             </p>
 
-            {/* Opções de Planos */}
-            <div className="space-y-3 md:space-y-4 mb-4 md:mb-6">
-              {/* Plano Anual - RECOMENDADO */}
-              <div 
-                onClick={() => !isRedirecting && setSelectedPlan('annual')}
-                className={`relative bg-[#f9f9f9] rounded-[16px] md:rounded-[20px] p-4 md:p-5 cursor-pointer transition-all duration-200 border-2 ${
-                  selectedPlan === 'annual' 
-                    ? 'border-[#FF911A] shadow-lg' 
-                    : 'border-transparent hover:border-gray-300'
-                } ${isRedirecting ? 'opacity-50 pointer-events-none' : ''}`}
-              >
+            {/* Plano Anual (único) */}
+            <div className="mb-4 md:mb-6">
+              <div className={`relative bg-[#f9f9f9] rounded-[16px] md:rounded-[20px] p-4 md:p-5 border-2 border-[#FF911A] shadow-lg ${isRedirecting ? 'opacity-50 pointer-events-none' : ''}`}>
                 {/* Badge Recomendado */}
                 <div className="absolute -top-2.5 md:-top-3 left-1/2 transform -translate-x-1/2">
                   <span className="bg-[#FF911A] text-white text-[10px] md:text-[11px] font-bold px-3 md:px-4 py-0.5 md:py-1 rounded-full shadow-md uppercase">
                     ⭐ Mais Popular
                   </span>
-                </div>
-
-                {/* Radio Button */}
-                <div className="absolute top-4 md:top-5 right-4 md:right-5">
-                  <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center ${
-                    selectedPlan === 'annual' 
-                      ? 'border-[#FF911A] bg-[#FF911A]' 
-                      : 'border-gray-300'
-                  }`}>
-                    {selectedPlan === 'annual' && (
-                      <svg width="12" height="12" className="md:w-[14px] md:h-[14px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                        <path d="M5 12l5 5L19 7"/>
-                      </svg>
-                    )}
-                  </div>
                 </div>
 
                 <div className="mt-2 md:mt-3">
@@ -217,71 +187,6 @@ export default function ThankYouStep() {
                   </div>
                 </div>
               </div>
-
-              {/* Plano Mensal */}
-              <div 
-                onClick={() => !isRedirecting && setSelectedPlan('monthly')}
-                className={`relative bg-[#f9f9f9] rounded-[16px] md:rounded-[20px] p-4 md:p-5 cursor-pointer transition-all duration-200 border-2 ${
-                  selectedPlan === 'monthly' 
-                    ? 'border-[#FF911A] shadow-lg' 
-                    : 'border-transparent hover:border-gray-300'
-                } ${isRedirecting ? 'opacity-50 pointer-events-none' : ''}`}
-              >
-                {/* Radio Button */}
-                <div className="absolute top-4 md:top-5 right-4 md:right-5">
-                  <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center ${
-                    selectedPlan === 'monthly' 
-                      ? 'border-[#FF911A] bg-[#FF911A]' 
-                      : 'border-gray-300'
-                  }`}>
-                    {selectedPlan === 'monthly' && (
-                      <svg width="12" height="12" className="md:w-[14px] md:h-[14px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                        <path d="M5 12l5 5L19 7"/>
-                      </svg>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Mensal</h3>
-                  
-                  <div className="mb-2 md:mb-3">
-                    <p className="text-[26px] md:text-[32px] font-bold text-black leading-none">
-                      R$ 30,90<span className="text-[14px] md:text-[16px] text-gray-600 font-normal">/mês</span>
-                    </p>
-                    <p className="text-[12px] md:text-[13px] text-gray-600 mt-1">
-                      Pagamento mensal recorrente
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5 md:space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                          <path d="M5 12l5 5L19 7"/>
-                        </svg>
-                      </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Acesso completo por 1 mês</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                          <path d="M5 12l5 5L19 7"/>
-                        </svg>
-                      </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Suporte prioritário</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg width="8" height="8" className="md:w-[10px] md:h-[10px]" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                          <path d="M5 12l5 5L19 7"/>
-                        </svg>
-                      </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-700">Todas as atualizações incluídas</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Garantia */}
@@ -301,7 +206,7 @@ export default function ThankYouStep() {
       <div className="flex-shrink-0 px-5 md:px-6 pb-5 md:pb-8 bg-white">
         <div className="max-w-md mx-auto w-full">
           <button
-            onClick={() => handleCheckout(selectedPlan)}
+            onClick={() => handleCheckout()}
             disabled={isRedirecting}
             className={`w-full py-3.5 md:py-5 px-5 md:px-6 rounded-[14px] font-bold text-[14px] md:text-[16px] transition-all duration-200 shadow-md uppercase ${
               isRedirecting
@@ -309,12 +214,7 @@ export default function ThankYouStep() {
                 : 'bg-[#FF911A] text-white active:bg-[#FF911A]/90 hover:bg-[#FF911A]/90'
             }`}
           >
-            {isRedirecting 
-              ? '🔄 Redirecionando...' 
-              : selectedPlan === 'annual' 
-                ? 'GARANTIR PLANO ANUAL' 
-                : 'GARANTIR PLANO MENSAL'
-            }
+            {isRedirecting ? '🔄 Redirecionando...' : 'GARANTIR PLANO ANUAL'}
           </button>
           
           <p className="text-center text-[10px] md:text-[12px] text-gray-500 mt-2">

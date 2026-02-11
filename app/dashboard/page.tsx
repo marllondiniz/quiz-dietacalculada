@@ -542,6 +542,7 @@ export default function DashboardPage() {
     const vendasTelefoneIdx = findColumnIndex(vendasHeaders, 'telefone', 'phone', 'celular');
     const vendasLeadIdIdx = findColumnIndex(vendasHeaders, 'lead id', 'id lead', 'lead');
     const vendasPedidoIdx = findColumnIndex(vendasHeaders, 'pedido', 'order id', 'invoice id', 'transaction id');
+    const vendasStatusIdx = findColumnIndex(vendasHeaders, 'status', 'reembolso', 'situação', 'situacao', 'refund');
 
     const gastosDateIdx = findColumnIndex(gastosHeaders, 'date', 'data', 'dia', 'Day', 'reporting_date');
     const gastosCampanhaIdx = findColumnIndex(gastosHeaders, 'campaign name', 'campaign', 'campanha', 'Campaign Name');
@@ -593,6 +594,7 @@ export default function DashboardPage() {
     const vendasTelefoneIdxRes = resolveIndex(vendasTelefoneIdx);
     const vendasLeadIdIdxRes = resolveIndex(vendasLeadIdIdx);
     const vendasPedidoIdxRes = resolveIndex(vendasPedidoIdx);
+    const vendasStatusIdxRes = resolveIndex(vendasStatusIdx);
 
     const pagina1DateIdxRes = resolveIndex(pagina1DateIdx, 0);
     const pagina1CampanhaIdxRes = resolveIndex(pagina1CampanhaIdx, 13);
@@ -647,6 +649,13 @@ export default function DashboardPage() {
       if (filterAnuncio && vendasAnuncioIdxRes >= 0) {
         const val = String(row[vendasAnuncioIdxRes] ?? '').trim();
         if (val !== filterAnuncio) return false;
+      }
+      // Excluir vendas reembolsadas: se existir coluna STATUS/REEMBOLSO e valor for "reembolsado", não contar
+      if (vendasStatusIdxRes >= 0) {
+        const status = String(row[vendasStatusIdxRes] ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (status === 'reembolsado' || status === 'reembolso' || status === 'refund' || status === 'cancelado' || status === 'cancelada') {
+          return false;
+        }
       }
       return true;
     };
