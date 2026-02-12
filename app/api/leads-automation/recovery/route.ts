@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
   getLeadsForRecoveryMessage, 
-  sendRecoveryWhatsApp, 
+  sendRecoveryWhatsApp,
+  sendRecoveryViaZaia,
   markLeadAsRecoverySent,
   markAllLeadsWithPhoneAsRecoverySent,
 } from '@/lib/leadsAutomation';
@@ -10,19 +11,21 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
- * CRON - Processa leads para recuperação do quiz via WhatsApp (única automação)
- * 
+ * CRON - Processa leads para recuperação do quiz via Zaia (message-template)
+ *
  * Executado a cada 1 minuto via Vercel Cron.
- * Envia mensagem de recuperação (template Sabrina) para leads que:
+ * Envia mensagem de recuperação (template via Zaia) para leads que:
  * - purchased = false (não compraram)
  * - recovery_msg01_sent_at está vazio (não receberam a mensagem)
- * - created_at >= 5 minutos atrás (mesma lógica que era usada na Zaia)
- * 
+ * - created_at >= 5 minutos atrás
+ *
  * GET/POST /api/leads-automation/recovery
- * 
+ *
  * Query params:
  * - minutes: tempo mínimo em minutos desde a criação (padrão: 5)
  * - secret: chave secreta para autorização (opcional, recomendado em produção)
+ * - testPhone: envia UMA mensagem só para este número (ex: 5527999123456). Não usa planilha.
+ * - testName: nome usado no template quando testPhone está presente (padrão: "Teste")
  */
 export async function GET(request: NextRequest) {
   return processRecovery(request);
@@ -54,10 +57,38 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    // Obter threshold de minutos (padrão: 5 — mesma lógica que era usada na Zaia)
     const minutesParam = request.nextUrl.searchParams.get('minutes');
     const minutes =
       minutesParam && !Number.isNaN(Number(minutesParam)) ? Number(minutesParam) : 5;
+    const testPhone = request.nextUrl.searchParams.get('testPhone')?.trim();
+    const testName = request.nextUrl.searchParams.get('testName')?.trim() || 'Teste';
+
+    // Modo teste: envia apenas para o seu número (não usa planilha)
+    if (testPhone) {
+      const phoneClean = testPhone.replace(/\D/g, '');
+      if (phoneClean.length < 10) {
+        return NextResponse.json({
+          error: 'testPhone inválido (mínimo 10 dígitos)',
+          example: '/api/leads-automation/recovery?secret=SEU_SECRET&testPhone=5527999123456&testName=Seu Nome',
+        }, { status: 400 });
+      }
+      console.log(`🧪 [RECOVERY] Modo teste: enviando 1 mensagem para ${testPhone} (${testName})`);
+      const result = await sendRecoveryViaZaia({
+        phone: testPhone,
+        FirstName: testName,
+      } as any);
+      return NextResponse.json({
+        success: result.success,
+        message: result.success ? 'Teste de envio (apenas seu número)' : 'Falha no envio via Zaia',
+        test: true,
+        sent: result.success ? 1 : 0,
+        failed: result.success ? 0 : 1,
+        to: testPhone,
+        name: testName,
+        ...(result.statusCode != null && { zaia_status: result.statusCode }),
+        ...(result.errorMessage && { zaia_error: result.errorMessage }),
+      });
+    }
 
     console.log(`⏱️ [RECOVERY] Threshold configurado: ${minutes} minutos`);
 
@@ -80,7 +111,6 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
     let sent = 0;
     let failed = 0;
 
-    // Processar cada lead
     const TEMPLATE_PAUSED_CODE = 132015;
     let templatePaused = false;
 
@@ -88,7 +118,7 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
       try {
         console.log(`📱 [RECOVERY] Processando: ${lead.FirstName} (${lead.phone})...`);
 
-        // Enviar mensagem via WhatsApp
+        // Enviar mensagem via Zaia (webhook message-template)
         const success = await sendRecoveryWhatsApp(lead);
 
         if (success) {
