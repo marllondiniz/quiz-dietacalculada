@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getLeadsForRecoveryMessage, 
+import { sendRecoveryTemplate } from '@/lib/whatsapp';
+import {
+  getLeadsForRecoveryMessage,
   sendRecoveryWhatsApp,
-  sendRecoveryViaZaia,
   markLeadAsRecoverySent,
   markAllLeadsWithPhoneAsRecoverySent,
 } from '@/lib/leadsAutomation';
@@ -11,10 +11,10 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
- * CRON - Processa leads para recuperação do quiz via Zaia (message-template)
+ * CRON - Processa leads para recuperação do quiz via API oficial WhatsApp
  *
  * Executado a cada 1 minuto via Vercel Cron.
- * Envia mensagem de recuperação (template via Zaia) para leads que:
+ * Envia mensagem de recuperação (template quiz_webhook_recuperacao_fernanda) para leads que:
  * - purchased = false (não compraram)
  * - recovery_msg01_sent_at está vazio (não receberam a mensagem)
  * - created_at >= 5 minutos atrás
@@ -72,22 +72,31 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
           example: '/api/leads-automation/recovery?secret=SEU_SECRET&testPhone=5527999123456&testName=Seu Nome',
         }, { status: 400 });
       }
-      console.log(`🧪 [RECOVERY] Modo teste: enviando 1 mensagem para ${testPhone} (${testName})`);
-      const result = await sendRecoveryViaZaia({
-        phone: testPhone,
-        FirstName: testName,
-      } as any);
-      return NextResponse.json({
-        success: result.success,
-        message: result.success ? 'Teste de envio (apenas seu número)' : 'Falha no envio via Zaia',
-        test: true,
-        sent: result.success ? 1 : 0,
-        failed: result.success ? 0 : 1,
-        to: testPhone,
-        name: testName,
-        ...(result.statusCode != null && { zaia_status: result.statusCode }),
-        ...(result.errorMessage && { zaia_error: result.errorMessage }),
-      });
+      const to = phoneClean.startsWith('55') ? phoneClean : '55' + phoneClean;
+      console.log(`🧪 [RECOVERY] Modo teste: enviando 1 mensagem WhatsApp para ${to} (${testName})`);
+      try {
+        await sendRecoveryTemplate({ to, name: testName });
+        return NextResponse.json({
+          success: true,
+          message: 'Teste de envio (apenas seu número)',
+          test: true,
+          sent: 1,
+          failed: 0,
+          to: testPhone,
+          name: testName,
+        });
+      } catch (err: any) {
+        return NextResponse.json({
+          success: false,
+          message: 'Falha no envio via WhatsApp',
+          test: true,
+          sent: 0,
+          failed: 1,
+          to: testPhone,
+          name: testName,
+          wa_error: err?.message || String(err),
+        }, { status: 200 });
+      }
     }
 
     console.log(`⏱️ [RECOVERY] Threshold configurado: ${minutes} minutos`);
@@ -118,7 +127,7 @@ async function processRecovery(request: NextRequest): Promise<NextResponse> {
       try {
         console.log(`📱 [RECOVERY] Processando: ${lead.FirstName} (${lead.phone})...`);
 
-        // Enviar mensagem via Zaia (webhook message-template)
+        // Enviar mensagem via API oficial WhatsApp
         const success = await sendRecoveryWhatsApp(lead);
 
         if (success) {

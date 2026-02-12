@@ -880,83 +880,49 @@ export async function markAllLeadsWithPhoneAsRecoverySent(phone: string): Promis
   }
 }
 
-/** URL do webhook Zaia para envio de template de mensagem (recuperação do quiz) */
-const ZAIA_MESSAGE_TEMPLATE_URL =
-  process.env.ZAIA_MESSAGE_TEMPLATE_URL ||
-  'https://api.zaia.app/v1.1/api/message-template/create/?templateId=7203&agentId=73288';
-
-export interface SendRecoveryResult {
-  success: boolean;
-  errorMessage?: string;
-  statusCode?: number;
-}
+// ==========================================
+// RECUPERAÇÃO DE QUIZ VIA API OFICIAL WHATSAPP
+// ==========================================
 
 /**
- * Envia mensagem de recuperação do quiz via Zaia (webhook message-template)
- *
- * @param lead - Lead para enviar a mensagem
- * @returns resultado com success e, em caso de falha, errorMessage e statusCode
- */
-export async function sendRecoveryViaZaia(lead: AutomationLead): Promise<SendRecoveryResult> {
-  const phoneClean = lead.phone.replace(/\D/g, '');
-  let formattedPhone = phoneClean;
-  if (!phoneClean.startsWith('55') && phoneClean.length >= 10) {
-    formattedPhone = '55' + phoneClean;
-  }
-
-  if ((process.env.ZAIA_DRY_RUN || process.env.WA_DRY_RUN || '').toLowerCase() === 'true') {
-    console.log('🧪 ZAIA_DRY_RUN/WA_DRY_RUN ativo — simulando envio Zaia (message-template):', {
-      phone: formattedPhone,
-      name: lead.FirstName,
-    });
-    return { success: true };
-  }
-
-  try {
-    const payload = {
-      phone: formattedPhone,
-      name: lead.FirstName,
-      FirstName: lead.FirstName,
-    };
-
-    const response = await fetch(ZAIA_MESSAGE_TEMPLATE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await response.text();
-
-    if (!response.ok) {
-      console.error('❌ Erro Zaia message-template:', response.status, text);
-      return {
-        success: false,
-        statusCode: response.status,
-        errorMessage: text || response.statusText,
-      };
-    }
-
-    console.log(`✅ Mensagem de recuperação (Zaia) enviada para ${lead.FirstName} (${formattedPhone})`);
-    return { success: true };
-  } catch (error: any) {
-    console.error('❌ Erro ao enviar mensagem de recuperação via Zaia:', error.message);
-    return {
-      success: false,
-      errorMessage: error.message || String(error),
-    };
-  }
-}
-
-/**
- * Envia mensagem de recuperação do quiz via Zaia (webhook message-template).
- * Antes era enviado pela API do WhatsApp; agora disparo é feito pela Zaia.
+ * Envia mensagem de recuperação do quiz via API oficial do WhatsApp Business
+ * (template quiz_webhook_recuperacao_fernanda - Fernanda, {{1}} = nome).
  *
  * @param lead - Lead para enviar a mensagem
  * @returns true se enviado com sucesso, false caso contrário
  */
 export async function sendRecoveryWhatsApp(lead: AutomationLead): Promise<boolean> {
-  const result = await sendRecoveryViaZaia(lead);
-  return result.success;
+  try {
+    const { sendRecoveryTemplate } = await import('./whatsapp');
+
+    const phoneClean = lead.phone.replace(/\D/g, '');
+    let formattedPhone = phoneClean;
+    if (!phoneClean.startsWith('55') && phoneClean.length >= 10) {
+      formattedPhone = '55' + phoneClean;
+    }
+
+    if ((process.env.WA_DRY_RUN || '').toLowerCase() === 'true') {
+      console.log('🧪 WA_DRY_RUN ativo — simulando envio WhatsApp:', {
+        to: formattedPhone,
+        name: lead.FirstName,
+      });
+      return true;
+    }
+
+    await sendRecoveryTemplate({
+      to: formattedPhone,
+      name: lead.FirstName,
+    });
+
+    console.log(`✅ Mensagem de recuperação (WhatsApp) enviada para ${lead.FirstName} (${formattedPhone})`);
+    return true;
+  } catch (error: any) {
+    if (error?.whatsappCode === 132015) {
+      throw error;
+    }
+    console.error('❌ Erro ao enviar mensagem de recuperação (WhatsApp):', error.message);
+    return false;
+  }
 }
 
 // ==========================================

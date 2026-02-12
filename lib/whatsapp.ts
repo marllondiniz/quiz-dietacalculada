@@ -16,11 +16,11 @@ export interface WhatsAppResponse {
 }
 
 /**
- * Envia template de recuperação do quiz via WhatsApp
- * 
- * Template: msg01_recuperacao_quiz_01
- * Mensagem: "Oi, {{1}}! Aqui é a Sabrina, do Dieta Calculada..."
- * 
+ * Envia template de recuperação do quiz via WhatsApp Business API
+ *
+ * Template padrão: quiz_webhook_recuperacao_fernanda (Fernanda, {{1}} = nome)
+ * Override via env: WA_RECOVERY_TEMPLATE_NAME
+ *
  * @param params - Parâmetros da mensagem (to, name)
  * @returns Resposta da API do WhatsApp
  */
@@ -58,7 +58,7 @@ export async function sendRecoveryTemplate(
   }
 
   // Nome do template (permite trocar via .env quando criar novo template no Meta)
-  const templateName = process.env.WA_RECOVERY_TEMPLATE_NAME || 'msg01_recuperacao_quiz_01';
+  const templateName = process.env.WA_RECOVERY_TEMPLATE_NAME || 'quiz_webhook_recuperacao_fernanda';
 
   // Montar URL da API
   const url = `https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`;
