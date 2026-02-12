@@ -527,17 +527,18 @@ export default function DashboardPage() {
     );
     const vendasPlanoIdx = findColumnIndex(vendasHeaders, 'plano', 'produto', 'offer', 'nome plano', 'plano contratado');
     const vendasCheckoutIdx = findColumnIndex(vendasHeaders, 'checkout', 'origem', 'origem da venda', 'gateway');
-    const vendasCampanhaIdx = findColumnIndex(vendasHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campaign');
-    const vendasCampanhaIdxRes = resolveIndex(
-      resolveIndex(vendasCampanhaIdx, findColumnIndex(vendasHeaders, 'campanha', 'campanha nome')),
-      13
-    );
-    const vendasConjuntoIdx = findColumnIndex(vendasHeaders, 'utm_content', 'adset', 'conjunto', 'ad set', 'adset name');
-    const vendasConjuntoIdxRes = resolveIndex(vendasConjuntoIdx, 15);
-    const vendasAnuncioIdx = findColumnIndex(vendasHeaders, 'utm_term', 'ad_name', 'anúncio', 'ad name');
+    const vendasCampanhaIdx = findColumnIndex(vendasHeaders, 'utm_campaign', 'campaign', 'campanha', 'Campaign', 'campanha nome');
+    const vendasCampanhaIdxRes = resolveIndex(vendasCampanhaIdx);
+    const vendasConjuntoIdx = findColumnIndex(vendasHeaders, 'utm_content', 'adset', 'conjunto', 'ad set', 'adset name', 'conjunto anuncio');
+    const vendasConjuntoIdxRes = resolveIndex(vendasConjuntoIdx);
+    const vendasAnuncioIdx = findColumnIndex(vendasHeaders, 'utm_term', 'ad_name', 'anúncio', 'ad name', 'anuncio');
     const vendasSourceIdx = findColumnIndex(vendasHeaders, 'utm_source', 'source', 'origem');
     const vendasMediumIdx = findColumnIndex(vendasHeaders, 'utm_medium', 'medium', 'meio');
-    const vendasFormaPagamentoIdx = findColumnIndex(vendasHeaders, 'forma de pagamento', 'forma pagamento', 'payment', 'metodo pagamento');
+    // Coluna FORMA DE PAGAMENTO:
+    // o usuário solicitou explicitamente usar SEMPRE a coluna H da planilha Lista Vendas,
+    // que corresponde ao índice 7 (0-based) no array de dados retornado pelo Google Sheets.
+    // Assim garantimos que os valores \"PIX\" e \"Cartão de Crédito\" da coluna H
+    // aparecem exatamente no card \"Forma de Pagamento\" do dashboard.
     const vendasEmailIdx = findColumnIndex(vendasHeaders, 'email', 'e-mail', 'email cliente');
     const vendasTelefoneIdx = findColumnIndex(vendasHeaders, 'telefone', 'phone', 'celular');
     const vendasLeadIdIdx = findColumnIndex(vendasHeaders, 'lead id', 'id lead', 'lead');
@@ -582,14 +583,27 @@ export default function DashboardPage() {
     const leadsAutomacaoLeadIdIdx = findColumnIndex(leadsAutomacaoHeaders, 'lead id', 'id lead', 'lead');
 
     const vendasDateIdxRes = resolveIndex(vendasDateIdx, 0);
-    const vendasAnuncioIdxRes = resolveIndex(vendasAnuncioIdx, 16);
+    const vendasAnuncioIdxRes = resolveIndex(vendasAnuncioIdx);
     const vendasSourceIdxRes = resolveIndex(vendasSourceIdx);
     const vendasMediumIdxRes = resolveIndex(vendasMediumIdx);
-    const vendasValorBrutoIdxRes = resolveIndex(vendasValorBrutoIdx, 5);
-    const vendasValorLiquidoIdxRes = resolveIndex(vendasValorLiquidoIdx, 6);
-    const vendasPlanoIdxRes = resolveIndex(vendasPlanoIdx, 4);
+    
+    // Força índices fixos para VALOR BRUTO (coluna F = índice 5) e VALOR LÍQUIDO (coluna G = índice 6)
+    // pois sabemos a estrutura exata da planilha Lista Vendas
+    const vendasValorBrutoIdxRes = 5;  // Coluna F: VALOR BRUTO
+    const vendasValorLiquidoIdxRes = 6; // Coluna G: VALOR LÍQUIDO
+    const vendasPlanoIdxRes = resolveIndex(vendasPlanoIdx);
     const vendasCheckoutIdxRes = resolveIndex(vendasCheckoutIdx, 2);
-    const vendasFormaPagamentoIdxRes = resolveIndex(vendasFormaPagamentoIdx, 7);
+    // Força a usar SEMPRE a coluna H (índice 7) como \"Forma de Pagamento\"
+    const vendasFormaPagamentoIdxRes = vendasHeaders.length > 7 ? 7 : -1;
+    
+    // Log de debug dos índices das colunas
+    console.log('[Dashboard] Índices das colunas de vendas:', {
+      campanha: vendasCampanhaIdxRes,
+      conjunto: vendasConjuntoIdxRes,
+      anuncio: vendasAnuncioIdxRes,
+      plano: vendasPlanoIdxRes,
+      formaPagamento: vendasFormaPagamentoIdxRes,
+    });
     const vendasEmailIdxRes = resolveIndex(vendasEmailIdx);
     const vendasTelefoneIdxRes = resolveIndex(vendasTelefoneIdx);
     const vendasLeadIdIdxRes = resolveIndex(vendasLeadIdIdx);
@@ -597,9 +611,9 @@ export default function DashboardPage() {
     const vendasStatusIdxRes = resolveIndex(vendasStatusIdx);
 
     const pagina1DateIdxRes = resolveIndex(pagina1DateIdx, 0);
-    const pagina1CampanhaIdxRes = resolveIndex(pagina1CampanhaIdx, 13);
-    const pagina1ConjuntoIdxRes = resolveIndex(pagina1ConjuntoIdx, 14);
-    const pagina1AnuncioIdxRes = resolveIndex(pagina1AnuncioIdx, 15);
+    const pagina1CampanhaIdxRes = resolveIndex(pagina1CampanhaIdx);
+    const pagina1ConjuntoIdxRes = resolveIndex(pagina1ConjuntoIdx);
+    const pagina1AnuncioIdxRes = resolveIndex(pagina1AnuncioIdx);
     const pagina1SourceIdxRes = resolveIndex(pagina1SourceIdx);
     const pagina1MediumIdxRes = resolveIndex(pagina1MediumIdx);
     const pagina1DeviceIdxRes = resolveIndex(pagina1DeviceIdx);
@@ -1130,13 +1144,25 @@ export default function DashboardPage() {
       value: filteredPagina1.filter((row) => step.test(row)).length,
     }));
 
+    // Somatórios financeiros direto da planilha (VALOR BRUTO / VALOR LÍQUIDO)
     const totalVendasValue = filteredVendas.reduce((acc, row) => {
-      const value = vendasValorBrutoIdxRes >= 0 ? row[vendasValorBrutoIdxRes] : row[5];
-      return acc + parseMoney(value);
+      const value = row[5]; // Coluna F: VALOR BRUTO
+      const parsed = parseMoney(value);
+      // Log para debug se vier valor estranho
+      if (parsed > 10000) {
+        console.warn('[Dashboard] Valor bruto suspeito:', { value, parsed, row: row.slice(0, 8) });
+      }
+      return acc + parsed;
     }, 0);
+
     const totalVendasLiquido = filteredVendas.reduce((acc, row) => {
-      const value = vendasValorLiquidoIdxRes >= 0 ? row[vendasValorLiquidoIdxRes] : row[6];
-      return acc + parseMoney(value);
+      const value = row[6]; // Coluna G: VALOR LÍQUIDO
+      const parsed = parseMoney(value);
+      // Log para debug se vier valor estranho
+      if (parsed > 10000) {
+        console.warn('[Dashboard] Valor líquido suspeito:', { value, parsed, row: row.slice(0, 8) });
+      }
+      return acc + parsed;
     }, 0);
     const vendasPorCheckout = filteredVendas.reduce((acc, row) => {
       const checkout = String((vendasCheckoutIdxRes >= 0 ? row[vendasCheckoutIdxRes] : row[2]) || '').toUpperCase();
@@ -1146,23 +1172,54 @@ export default function DashboardPage() {
     const PLANO_INV = /^plano(\s*1)?$/i;
     const vendasPorPlano = filteredVendas.reduce((acc, row) => {
       const plano = String((vendasPlanoIdxRes >= 0 ? row[vendasPlanoIdxRes] : row[4]) || '').trim();
-      if (plano && !PLANO_INV.test(plano)) acc[plano] = (acc[plano] || 0) + 1;
+      if (plano && !PLANO_INV.test(plano)) {
+        acc[plano] = (acc[plano] || 0) + 1;
+      }
       return acc;
     }, {} as Record<string, number>);
-    const vendasPorPlanoExibir = Object.entries(vendasPorPlano).filter(([p]) => !PLANO_INV.test(String(p).trim()));
+
+    // Entradas completas (para uso em textos, se necessário)
+    const vendasPorPlanoEntries = Object.entries(vendasPorPlano).filter(
+      ([p]) => !PLANO_INV.test(String(p).trim())
+    );
+
+    // Limitamos no máximo aos 6 planos mais vendidos para não estourar o layout
+    const vendasPorPlanoExibir = vendasPorPlanoEntries
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+
+    // Log de debug para ver quais planos foram encontrados quando nada aparece
+    if (vendasPorPlanoExibir.length === 0 && filteredVendas.length > 0) {
+      console.warn('[Dashboard] Nenhum plano válido encontrado. Primeiras 3 vendas:', 
+        filteredVendas.slice(0, 3).map((row) => ({
+          planoIdx: vendasPlanoIdxRes,
+          planoValue: row[vendasPlanoIdxRes >= 0 ? vendasPlanoIdxRes : 4],
+          rowPreview: row.slice(0, 10),
+        }))
+      );
+    }
     const vendasPorCampanha = Object.fromEntries(
       Array.from(vendasPorCampanhaMap.entries()).filter(([nome]) => !!nome)
     );
+    
+    // Log de debug para ver as campanhas
+    console.log('[Dashboard] Campanhas encontradas:', 
+      Array.from(vendasPorCampanhaMap.entries()).slice(0, 5).map(([nome, count]) => ({ nome, count }))
+    );
     const vendasPorFormaPagamento = filteredVendas.reduce((acc, row) => {
-      const raw = String(
-        (vendasFormaPagamentoIdxRes >= 0 ? row[vendasFormaPagamentoIdxRes] : row[7]) ?? ''
-      )
+      const cell = vendasFormaPagamentoIdxRes >= 0 ? row[vendasFormaPagamentoIdxRes] : row[7];
+      const raw = String(cell ?? '')
         .trim()
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
+      if (!raw) return acc;
       if (raw.includes('pix')) acc.pix += 1;
-      else if (raw.includes('credito') || raw.includes('credit') || (raw.includes('cartao') && !raw.includes('debito'))) acc.cartaoCredito += 1;
+      else if (
+        raw.includes('credito') ||
+        raw.includes('credit') ||
+        (raw.includes('cartao') && !raw.includes('debito'))
+      ) acc.cartaoCredito += 1;
       return acc;
     }, { pix: 0, cartaoCredito: 0 });
 
@@ -1440,16 +1497,6 @@ export default function DashboardPage() {
     totalClicks,
     cpm,
   } = filteredResumo;
-
-  const melhorAnuncio = (() => {
-    const entries = Object.entries(vendasPorCampanha);
-    if (entries.length === 0) return null;
-    let best = entries[0];
-    for (let i = 1; i < entries.length; i++) {
-      if (entries[i][1] > best[1]) best = entries[i];
-    }
-    return { nome: best[0], vendas: best[1] };
-  })();
 
   const hasActiveFilters = filterDateFrom || filterDateTo || filterCampanha || filterConjunto || filterAnuncio;
   const clearFilters = () => {
@@ -1829,6 +1876,22 @@ export default function DashboardPage() {
                   <p className="text-white text-2xl font-bold">{filteredVendas.length}</p>
                 </div>
 
+                {/* Pagamentos (PIX x Cartão) */}
+                <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center">
+                      <IconCurrency className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-sm mb-1">Compras por forma de pagamento</p>
+                  <p className="text-white text-lg font-semibold">
+                    PIX: <span className="text-emerald-400">{vendasPorFormaPagamento.pix}</span>
+                  </p>
+                  <p className="text-white text-lg font-semibold mt-1">
+                    Cartão: <span className="text-sky-400">{vendasPorFormaPagamento.cartaoCredito}</span>
+                  </p>
+                </div>
+
                 {/* Ticket Médio */}
                 <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-6 hover:border-slate-600 transition-colors shadow-lg hover:shadow-xl">
                   <div className="flex items-center justify-between mb-3">
@@ -1886,116 +1949,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Cards principais em grid (inclui ROI, CPL, Ticket) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-sky-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
-                    <IconUsers className="w-5 h-5 text-sky-400" />
-                  </div>
-                  <span className="text-slate-500 text-xs">Topo do funil</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads captados</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsCount.toLocaleString('pt-BR')}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
-                  <span className="text-slate-400">→ automação</span>
-                  <span className="text-sky-300 font-semibold">{formatPercent(leadToAutomationRateValue)}</span>
-                </div>
-                <div className="mt-2 h-2 bg-slate-900/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400"
-                    style={{ width: `${leadToAutomationProgress}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-purple-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                    <IconCog className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <span className="text-slate-500 text-xs">Fluxo ativo</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Leads na automação</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredLeadsAutomacaoCount.toLocaleString('pt-BR')}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
-                  <span className="text-slate-400">Zaia enviados</span>
-                  <span className="text-purple-300 font-semibold">{filteredZaiaCount.toLocaleString('pt-BR')}</span>
-                </div>
-                <p className="text-slate-500 text-[11px] mt-2">Participação Zaia: {formatPercent(zaiaRateValue)}</p>
-              </div>
-
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-emerald-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                    <IconCheck className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <span className="text-slate-500 text-xs">Resultado</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Conversões</p>
-                <p className="text-white text-2xl font-bold mt-1">{filteredPurchasedCount.toLocaleString('pt-BR')}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
-                  <span className="text-slate-400">Checkout → venda</span>
-                  <span className="text-emerald-300 font-semibold">{formatPercent(automationToSaleRateValue)}</span>
-                </div>
-                <div className="mt-2 h-2 bg-slate-900/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300"
-                    style={{ width: `${automationToSaleProgress}%` }}
-                  />
-                </div>
-                <p className="text-slate-500 text-[11px] mt-2">Lead → venda: {formatPercent(leadToSaleRateValue)}</p>
-              </div>
-
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-amber-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                    <IconTrending className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <span className="text-slate-500 text-xs">{filteredGastosCount} linhas</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Investimento</p>
-                <p className="text-white text-2xl font-bold mt-1">{formatCurrency(amountSpentTotal, 0)}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/60 px-2 py-1 text-slate-300">
-                    CPL {formatCurrency(cpl)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-700/60 px-2 py-1 text-slate-300">
-                    CPA {formatCurrency(cpa)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-sky-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
-                    <IconCurrency className="w-5 h-5 text-sky-400" />
-                  </div>
-                  <span className="text-slate-500 text-xs">Valor médio</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Ticket médio</p>
-                <p className="text-white text-2xl font-bold mt-1">{formatCurrency(ticketMedioBruto)}</p>
-                <p className="text-slate-500 text-xs mt-2">Líquido: <span className="text-slate-300 font-semibold">{formatCurrency(ticketMedioLiquido)}</span></p>
-              </div>
-
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/60 p-5 hover:border-emerald-500/30 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                    <IconTrending className="w-5 h-5 text-emerald-400 rotate-90" />
-                  </div>
-                  <span className="text-slate-500 text-xs">Saúde do funil</span>
-                </div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">ROI</p>
-                <p className="text-white text-2xl font-bold mt-1">
-                  {roi !== null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
-                </p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
-                  <span className="text-slate-400">Tempo médio</span>
-                  <span className="text-emerald-300 font-semibold">{tempoMedioConversaoTexto}</span>
-                </div>
-                <p className="text-slate-500 text-[11px] mt-2">≈ {tempoMedioConversaoHorasTexto}</p>
-              </div>
-            </div>
+            {/* Cards principais em grid removidos a pedido do usuário */}
 
             {/* ETAPA 2: Gráfico Faturamento Líquido vs Investimento vs Lucro */}
             <div className="space-y-6">
@@ -2235,148 +2189,7 @@ export default function DashboardPage() {
             </div>
 
 
-            {/* Gráficos de Vendas */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-1 bg-gradient-to-b from-indigo-500 to-indigo-600 rounded-full"></div>
-                  <h2 className="text-white text-2xl font-bold flex items-center gap-2">
-                    <IconCart className="w-6 h-6 text-indigo-400" />
-                    Análise de Vendas
-                  </h2>
-                </div>
-                <div className="flex-1 h-px bg-gradient-to-r from-slate-700 to-transparent"></div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Vendas por Plano */}
-              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/40">
-                  <h3 className="text-white font-semibold text-lg">Vendas por Plano</h3>
-                  <div className="flex gap-3">
-                    {vendasPorPlanoExibir.map(([plano, count], i) => (
-                      <span key={plano} className="flex items-center gap-1.5 text-xs">
-                        <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-sky-400' : i === 1 ? 'bg-emerald-400' : 'bg-purple-400'}`} />
-                        <span className="text-slate-400">{plano}: <span className="text-white font-medium">{count}</span></span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={vendasPorPlanoExibir.map(([name, count]) => ({ name: name || 'Outro', vendas: count }))} margin={{ top: 8, right: 8, left: -10, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(51 65 85)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                      <Bar dataKey="vendas" fill="url(#colorGradient)" radius={[6, 6, 0, 0]} />
-                      <defs>
-                        <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#0ea5e9" />
-                          <stop offset="100%" stopColor="#0284c7" />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                {vendasPorPlanoExibir.length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nenhuma venda registrada</p>}
-              </div>
-
-              {/* Forma de Pagamento */}
-              <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-white font-semibold">Forma de Pagamento</h3>
-                  <div className="text-xs text-slate-400">
-                    Total: <span className="text-white font-medium">{vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-3 h-3 rounded-full bg-emerald-400" />
-                      <span className="text-slate-300 text-sm">PIX</span>
-                    </div>
-                    <p className="text-white text-2xl font-bold">{vendasPorFormaPagamento.pix}</p>
-                    <p className="text-emerald-400 text-xs mt-1">
-                      {((vendasPorFormaPagamento.pix / Math.max(1, vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito)) * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-3 h-3 rounded-full bg-sky-400" />
-                      <span className="text-slate-300 text-sm">Cartão</span>
-                    </div>
-                    <p className="text-white text-2xl font-bold">{vendasPorFormaPagamento.cartaoCredito}</p>
-                    <p className="text-sky-400 text-xs mt-1">
-                      {((vendasPorFormaPagamento.cartaoCredito / Math.max(1, vendasPorFormaPagamento.pix + vendasPorFormaPagamento.cartaoCredito)) * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                </div>
-                <div className="h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'PIX', value: vendasPorFormaPagamento.pix },
-                          { name: 'Cartão', value: vendasPorFormaPagamento.cartaoCredito },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={35}
-                        outerRadius={55}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        <Cell fill="#10b981" stroke="rgb(15 23 42)" strokeWidth={2} />
-                        <Cell fill="#0ea5e9" stroke="rgb(15 23 42)" strokeWidth={2} />
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Top Campanhas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Campanhas */}
-              <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 p-6">
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/40">
-                  <h3 className="text-white font-semibold text-lg">Top Campanhas</h3>
-                  {melhorAnuncio && (
-                    <span className="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-                      Melhor: {melhorAnuncio.vendas} vendas
-                    </span>
-                  )}
-                </div>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={Object.entries(vendasPorCampanha)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 6)
-                        .map(([name, vendas]) => ({ name: name.length > 25 ? name.slice(0, 22) + '…' : name, vendas }))}
-                      margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
-                      layout="vertical"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(51 65 85)" horizontal={false} />
-                      <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" width={140} tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                      <Bar dataKey="vendas" fill="url(#purpleGradient)" radius={[0, 6, 6, 0]} />
-                      <defs>
-                        <linearGradient id="purpleGradient" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#a78bfa" />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                {Object.keys(vendasPorCampanha).length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nenhuma campanha com vendas</p>}
-              </div>
-              </div>
-            </div>
+            {/* (Bloco de \"Análise de Vendas\" e \"Top Campanhas\" removido a pedido do usuário) */}
 
             {/* Funil do Quiz */}
             <div className="space-y-6">
