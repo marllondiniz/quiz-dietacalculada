@@ -95,10 +95,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isV2 = quizVersion === 'v2';
+    // v2 oferece apenas plano anual (R$ 197); plano mensal não é suportado
+    if (isV2 && plan === 'monthly') {
+      return NextResponse.json(
+        { success: false, error: 'Oferta v2 suporta apenas plano anual' } as CheckoutResponse,
+        { status: 400 }
+      );
+    }
+
     sheets = await getGoogleSheetsClient();
     
     const variant: CheckoutVariant = 'hubla';
-    const isV2 = quizVersion === 'v2';
     
     // v2: oferta R$ 197 / 12x R$ 20,38 — link específico
     const checkoutUrl = isV2 && plan === 'annual'
