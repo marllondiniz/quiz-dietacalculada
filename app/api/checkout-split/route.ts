@@ -12,15 +12,19 @@ export type CheckoutVariant = 'hubla';
 export type PlanType = 'annual' | 'monthly';
 
 const CHECKOUT_VERSION = '100_hubla_v2';
+const CHECKOUT_VERSION_V2 = '100_hubla_v2_197';
 const DATA_SHEET_NAME = 'Página1';
 
-// URLs de checkout - Hubla
+// URLs de checkout - Hubla (v1: R$ 109,90 / 12x R$ 11,37)
 const CHECKOUT_URLS: Record<CheckoutVariant, { annual: string; monthly: string }> = {
   hubla: {
     annual: 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3',
     monthly: 'https://pay.hub.la/kDORNq8Jp0xTWlsJtEB0',
   },
 };
+
+// Oferta v2: R$ 197 ou 12x R$ 20,38
+const CHECKOUT_URL_V2_ANNUAL = 'https://pay.hub.la/auru2M9e7OlmQlNZYuxJ';
 
 interface CheckoutSuccessResponse {
   success: true;
@@ -52,19 +56,18 @@ async function getGoogleSheetsClient() {
 
 function buildCheckoutUrl(variant: CheckoutVariant, plan: PlanType, utmParams: Record<string, string>): string {
   const baseUrl = CHECKOUT_URLS[variant][plan];
-  
+  return buildCheckoutUrlFromBase(baseUrl, utmParams);
+}
+
+function buildCheckoutUrlFromBase(baseUrl: string, utmParams: Record<string, string>): string {
   const params = new URLSearchParams();
   Object.entries(utmParams).forEach(([key, value]) => {
     if (value) {
       params.append(key, value);
     }
   });
-  
   const queryString = params.toString();
-  if (!queryString) {
-    return baseUrl;
-  }
-  
+  if (!queryString) return baseUrl;
   const separator = baseUrl.includes('?') ? '&' : '?';
   return `${baseUrl}${separator}${queryString}`;
 }
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { plan, utmParams = {}, quizData = {} } = body;
+    const { plan, utmParams = {}, quizData = {}, quizVersion } = body;
 
     if (!plan || !['annual', 'monthly'].includes(plan)) {
       return NextResponse.json(
@@ -92,14 +95,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isV2 = quizVersion === 'v2';
+    // v2 oferece apenas plano anual (R$ 197); plano mensal não é suportado
+    if (isV2 && plan === 'monthly') {
+      return NextResponse.json(
+        { success: false, error: 'Oferta v2 suporta apenas plano anual' } as CheckoutResponse,
+        { status: 400 }
+      );
+    }
+
     sheets = await getGoogleSheetsClient();
     
-    // ✅ 100% HUBLA - Todos usuários direcionados para Hubla
     const variant: CheckoutVariant = 'hubla';
     
-    const checkoutUrl = buildCheckoutUrl(variant, plan, utmParams);
+    // v2: oferta R$ 197 / 12x R$ 20,38 — link específico
+    const checkoutUrl = isV2 && plan === 'annual'
+      ? buildCheckoutUrlFromBase(CHECKOUT_URL_V2_ANNUAL, utmParams)
+      : buildCheckoutUrl(variant, plan, utmParams);
     
-    console.log(`🎯 Checkout ${variant.toUpperCase()} (100% Hubla) - Plano: ${plan}`);
+    const checkoutVersion = isV2 ? CHECKOUT_VERSION_V2 : CHECKOUT_VERSION;
+    
+    console.log(`🎯 Checkout ${variant.toUpperCase()}${isV2 ? ' (v2 R$197)' : ''} - Plano: ${plan}`);
     
     // Preparar dados para salvar na planilha principal
     const timestamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -203,7 +219,7 @@ export async function POST(request: NextRequest) {
       variant,                                      // V - Step 23: Checkout Variant
       plan,                                         // W - Step 23: Checkout Plan
       checkoutUrl,                                  // X - Step 23: Checkout URL
-      CHECKOUT_VERSION,                             // Y - Step 23: Checkout Version
+      checkoutVersion,                              // Y - Step 23: Checkout Version
       quizData.referralCode || '',                  // Z - Código Referência
       quizData.heardFrom || '',                     // AA - Onde Ouviu
       quizData.addBurnedCalories ? 'Sim' : 'Não',   // AB - Add Calorias
@@ -262,7 +278,7 @@ export async function POST(request: NextRequest) {
       checkout_variant: variant,
       checkout_plan: plan,
       checkout_url: checkoutUrl,
-      checkout_version: CHECKOUT_VERSION,
+      checkout_version: checkoutVersion,
     } as CheckoutResponse);
 
   } catch (error: any) {

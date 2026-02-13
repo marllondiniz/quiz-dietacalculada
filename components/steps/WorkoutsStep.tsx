@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const workoutOptions = [
   { id: '0-2', label: '0-2 exercícios', description: 'Leve' },
@@ -12,6 +13,7 @@ const workoutOptions = [
 
 export default function WorkoutsStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleSelect = (workoutId: string) => {
@@ -21,7 +23,7 @@ export default function WorkoutsStep() {
   const handleContinue = () => {
     if (answers.workoutsPerWeek) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

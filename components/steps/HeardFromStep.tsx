@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const sources = [
   { id: 'youtube', label: 'Youtube', icon: 'youtube', color: 'bg-red-500' },
@@ -16,6 +17,7 @@ const sources = [
 
 export default function HeardFromStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleSelect = (sourceId: string) => {
@@ -25,7 +27,7 @@ export default function HeardFromStep() {
   const handleContinue = () => {
     if (answers.heardFrom) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

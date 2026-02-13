@@ -9,11 +9,14 @@ import { useQuizProgress } from '@/hooks/useQuizProgress';
 interface QuizLayoutProps {
   children: React.ReactNode;
   showBackButton?: boolean;
+  /** Base path do quiz (ex: /quiz ou /quiz-v2) para navegação do botão voltar */
+  basePath?: string;
 }
 
 export default function QuizLayout({
   children,
   showBackButton = true,
+  basePath = '/quiz',
 }: QuizLayoutProps) {
   const { currentStep, totalSteps, previousStep } = useQuizStore();
   const router = useRouter();
@@ -49,7 +52,7 @@ export default function QuizLayout({
 
   const handleBack = () => {
     previousStep();
-    router.push(`/quiz/${currentStep - 1}`);
+    router.push(`${basePath}/${currentStep - 1}`);
   };
 
   return (

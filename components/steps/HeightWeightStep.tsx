@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import { useState } from 'react';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function HeightWeightStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
   
   const [heightCm, setHeightCm] = useState(answers.heightCm || 170);
@@ -25,7 +27,7 @@ export default function HeightWeightStep() {
     updateAnswer('weightKg', weightKg);
     updateAnswer('unit', 'metric');
     nextStep();
-    router.push(`/quiz/${currentStep + 1}`);
+    router.push(`${basePath}/${currentStep + 1}`);
   };
 
   return (

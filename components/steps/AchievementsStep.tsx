@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const achievements = [
   { id: 'saudavel', label: 'Viver de forma mais saudável' },
@@ -13,6 +14,7 @@ const achievements = [
 
 export default function AchievementsStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleToggle = (achievementId: string) => {
@@ -26,7 +28,7 @@ export default function AchievementsStep() {
   const handleContinue = () => {
     if (answers.achievements && answers.achievements.length > 0) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

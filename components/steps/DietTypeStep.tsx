@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const diets = [
   { id: 'classico', label: 'Clássico', description: 'Como de tudo' },
@@ -12,6 +13,7 @@ const diets = [
 
 export default function DietTypeStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleSelect = (dietId: string) => {
@@ -21,7 +23,7 @@ export default function DietTypeStep() {
   const handleContinue = () => {
     if (answers.dietType) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

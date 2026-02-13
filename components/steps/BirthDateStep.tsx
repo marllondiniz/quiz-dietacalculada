@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function BirthDateStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
   
   const [day, setDay] = useState(answers.birthDate?.getDate() || 15);
@@ -67,7 +69,7 @@ export default function BirthDateStep() {
     updateAnswer('age', age);
     console.log('📅 Salvando data de nascimento e idade:', { birthDate, age });
     nextStep();
-    router.push(`/quiz/${currentStep + 1}`);
+    router.push(`${basePath}/${currentStep + 1}`);
   };
 
   return (

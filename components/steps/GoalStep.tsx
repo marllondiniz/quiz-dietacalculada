@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const goals = [
   { id: 'perder', label: 'Perder peso' },
@@ -12,6 +13,7 @@ const goals = [
 
 export default function GoalStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleSelect = (goalId: string) => {
@@ -21,7 +23,7 @@ export default function GoalStep() {
   const handleContinue = () => {
     if (answers.goal) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

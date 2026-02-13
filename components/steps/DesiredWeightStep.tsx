@@ -4,10 +4,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useState, useRef, useEffect } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function DesiredWeightStep() {
   const router = useRouter();
   const params = useParams();
+  const basePath = useQuizBasePath();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { updateAnswer, nextStep, answers } = useQuizStore();
   
@@ -18,7 +20,7 @@ export default function DesiredWeightStep() {
     if (goal === 'manter') {
       updateAnswer('desiredWeightKg', currentWeight);
       nextStep();
-      router.replace(`/quiz/${currentStepFromUrl + 1}`);
+      router.replace(`${basePath}/${currentStepFromUrl + 1}`);
     }
   }, [goal, currentWeight, currentStepFromUrl, nextStep, router, updateAnswer]);
 
@@ -70,7 +72,7 @@ export default function DesiredWeightStep() {
     if (!isValidWeight()) return;
     updateAnswer('desiredWeightKg', desiredWeight);
     nextStep();
-    router.push(`/quiz/${currentStepFromUrl + 1}`);
+    router.push(`${basePath}/${currentStepFromUrl + 1}`);
   };
 
   // Função para calcular peso baseado na posição X

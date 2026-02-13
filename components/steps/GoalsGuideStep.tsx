@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useEffect, useState } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function GoalsGuideStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { nextStep, currentStep } = useQuizStore();
   const [canContinue, setCanContinue] = useState(false);
 
@@ -18,7 +20,7 @@ export default function GoalsGuideStep() {
 
   const handleContinue = () => {
     nextStep();
-    router.push(`/quiz/${currentStep + 1}`);
+    router.push(`${basePath}/${currentStep + 1}`);
   };
 
   return (

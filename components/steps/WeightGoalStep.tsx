@@ -4,10 +4,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useEffect, useState } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function WeightGoalStep() {
   const router = useRouter();
   const params = useParams();
+  const basePath = useQuizBasePath();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep, answers } = useQuizStore();
   const [canContinue, setCanContinue] = useState(false);
@@ -22,7 +24,7 @@ export default function WeightGoalStep() {
   useEffect(() => {
     if (goal === 'manter') {
       nextStep();
-      router.replace(`/quiz/${currentStepFromUrl + 1}`);
+      router.replace(`${basePath}/${currentStepFromUrl + 1}`);
     } else {
       // Habilitar botão após 2 segundos (tempo mínimo de leitura)
       const enableButton = setTimeout(() => setCanContinue(true), 2000);
@@ -42,7 +44,7 @@ export default function WeightGoalStep() {
 
   const handleContinue = () => {
     nextStep();
-    router.push(`/quiz/${currentStepFromUrl + 1}`);
+    router.push(`${basePath}/${currentStepFromUrl + 1}`);
   };
 
   return (
