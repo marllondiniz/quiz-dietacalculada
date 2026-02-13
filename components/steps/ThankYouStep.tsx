@@ -2,9 +2,15 @@
 
 import { useState, useMemo } from 'react';
 import { useQuizStore, type QuizAnswers } from '@/store/quizStore';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
+
+/** Oferta v2: R$ 197 à vista ou 12x R$ 20,38 — link Hubla específico */
+const CHECKOUT_V2_URL = 'https://pay.hub.la/auru2M9e7OlmQlNZYuxJ';
+const FALLBACK_V1_URL = 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3';
 
 export default function ThankYouStep() {
+  const pathname = usePathname();
+  const isV2 = pathname?.startsWith('/v2');
   const { answers, leadId } = useQuizStore();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const searchParams = useSearchParams();
@@ -75,6 +81,7 @@ export default function ThankYouStep() {
           plan: 'annual',
           utmParams,
           quizData,
+          quizVersion: isV2 ? 'v2' : undefined,
         }),
       });
 
@@ -92,19 +99,13 @@ export default function ThankYouStep() {
         window.location.href = result.checkout_url;
       } else {
         console.error('❌ Erro na API de checkout split:', result);
-        
-        // Fallback: redirecionar para Hubla (plano anual) em caso de erro
-        const fallbackUrl = 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3';
-        
+        const fallbackUrl = isV2 ? CHECKOUT_V2_URL : FALLBACK_V1_URL;
         console.log('🔄 Usando fallback Hubla:', fallbackUrl);
         window.location.href = fallbackUrl;
       }
     } catch (error) {
       console.error('❌ Erro ao processar checkout:', error);
-      
-      // Fallback: redirecionar para Hubla (plano anual) em caso de erro
-      const fallbackUrl = 'https://pay.hub.la/LG07vLA6urwSwXjGiTm3';
-      
+      const fallbackUrl = isV2 ? CHECKOUT_V2_URL : FALLBACK_V1_URL;
       console.log('🔄 Usando fallback Hubla:', fallbackUrl);
       window.location.href = fallbackUrl;
     }
@@ -140,23 +141,36 @@ export default function ThankYouStep() {
                   <h3 className="text-[17px] md:text-[20px] font-bold text-black mb-1.5 md:mb-2">Plano Anual</h3>
                   
                   <div className="mb-2 md:mb-3">
-                    {/* Valor destacado - 12x R$ 11,37 */}
-                    <div className="bg-gradient-to-br from-[#FF911A]/10 to-[#FF6B00]/10 rounded-xl p-3 md:p-4 mb-2 border-2 border-[#FF911A]/30">
-                      <div className="flex items-baseline justify-center gap-1.5">
-                        <span className="text-[18px] md:text-[22px] font-bold text-gray-700">12x de</span>
-                        <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 11,37</span>
-                      </div>
-                      <p className="text-[11px] md:text-[12px] text-gray-600 text-center mt-1">
-                        ou R$ 109,90 à vista
-                      </p>
-                    </div>
-                    
-                    {/* Badge de economia destacado */}
-                    <div className="flex justify-center mt-2">
-                      <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-1.5 rounded-full text-[12px] md:text-[13px] font-bold shadow-lg transform hover:scale-105 transition-transform">
-                        💰 Economize R$ 260,90 no ano!
-                      </div>
-                    </div>
+                    {isV2 ? (
+                      <>
+                        <div className="bg-gradient-to-br from-[#FF911A]/10 to-[#FF6B00]/10 rounded-xl p-3 md:p-4 mb-2 border-2 border-[#FF911A]/30">
+                          <div className="flex items-baseline justify-center gap-1.5">
+                            <span className="text-[18px] md:text-[22px] font-bold text-gray-700">12x de</span>
+                            <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 20,38</span>
+                          </div>
+                          <p className="text-[11px] md:text-[12px] text-gray-600 text-center mt-1">
+                            ou R$ 197,00 à vista
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-gradient-to-br from-[#FF911A]/10 to-[#FF6B00]/10 rounded-xl p-3 md:p-4 mb-2 border-2 border-[#FF911A]/30">
+                          <div className="flex items-baseline justify-center gap-1.5">
+                            <span className="text-[18px] md:text-[22px] font-bold text-gray-700">12x de</span>
+                            <span className="text-[36px] md:text-[48px] font-extrabold text-[#FF911A] leading-none drop-shadow-sm">R$ 11,37</span>
+                          </div>
+                          <p className="text-[11px] md:text-[12px] text-gray-600 text-center mt-1">
+                            ou R$ 109,90 à vista
+                          </p>
+                        </div>
+                        <div className="flex justify-center mt-2">
+                          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-1.5 rounded-full text-[12px] md:text-[13px] font-bold shadow-lg transform hover:scale-105 transition-transform">
+                            💰 Economize R$ 260,90 no ano!
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 md:space-y-2">

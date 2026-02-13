@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 import { useState } from 'react';
 import { 
   trackFacebookEvent, 
@@ -13,6 +14,7 @@ import {
 
 export default function ContactInfoStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
   
   const [name, setName] = useState(answers.name || '');
@@ -75,7 +77,7 @@ export default function ContactInfoStep() {
         .catch((err) => console.error('❌ Falha na requisição de automação:', err));
       
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function ReferralCodeStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep } = useQuizStore();
   const [code, setCode] = useState('');
 
@@ -14,12 +16,12 @@ export default function ReferralCodeStep() {
       updateAnswer('referralCode', code.trim());
     }
     nextStep();
-    router.push(`/quiz/${currentStep + 1}`);
+    router.push(`${basePath}/${currentStep + 1}`);
   };
 
   const handleSkip = () => {
     nextStep();
-    router.push(`/quiz/${currentStep + 1}`);
+    router.push(`${basePath}/${currentStep + 1}`);
   };
 
   return (

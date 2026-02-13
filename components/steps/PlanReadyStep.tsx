@@ -4,10 +4,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useMemo, useEffect, useState } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function PlanReadyStep() {
   const router = useRouter();
   const params = useParams();
+  const basePath = useQuizBasePath();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep, answers } = useQuizStore();
   const [isAnimated, setIsAnimated] = useState(false);
@@ -192,7 +194,7 @@ export default function PlanReadyStep() {
 
   const handleContinue = () => {
     nextStep();
-    router.push(`/quiz/${currentStepFromUrl + 1}`);
+    router.push(`${basePath}/${currentStepFromUrl + 1}`);
   };
 
   // Componente de círculo de progresso animado

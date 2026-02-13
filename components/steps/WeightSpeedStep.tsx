@@ -4,10 +4,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
 import { useState, useEffect } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function WeightSpeedStep() {
   const router = useRouter();
   const params = useParams();
+  const basePath = useQuizBasePath();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { updateAnswer, nextStep, answers } = useQuizStore();
   
@@ -23,7 +25,7 @@ export default function WeightSpeedStep() {
     if (goal === 'manter') {
       updateAnswer('weightSpeedPerWeek', 0);
       nextStep();
-      router.replace(`/quiz/${currentStepFromUrl + 1}`);
+      router.replace(`${basePath}/${currentStepFromUrl + 1}`);
     }
   }, [goal, currentStepFromUrl, nextStep, router, updateAnswer]);
 
@@ -35,7 +37,7 @@ export default function WeightSpeedStep() {
   const handleContinue = () => {
     updateAnswer('weightSpeedPerWeek', weightSpeed);
     nextStep();
-    router.push(`/quiz/${currentStepFromUrl + 1}`);
+    router.push(`${basePath}/${currentStepFromUrl + 1}`);
   };
 
   // Calcular posição do slider (0-100%)

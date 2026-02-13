@@ -3,10 +3,12 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import { useEffect, useState } from 'react';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 export default function LoadingStep() {
   const router = useRouter();
   const params = useParams();
+  const basePath = useQuizBasePath();
   const currentStepFromUrl = parseInt(params.step as string, 10);
   const { nextStep } = useQuizStore();
   const [progress, setProgress] = useState(0);
@@ -28,7 +30,7 @@ export default function LoadingStep() {
           clearInterval(interval);
           setTimeout(() => {
             nextStep();
-            router.push(`/quiz/${currentStepFromUrl + 1}`);
+            router.push(`${basePath}/${currentStepFromUrl + 1}`);
           }, 800);
           return 100;
         }

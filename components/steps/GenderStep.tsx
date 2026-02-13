@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const genders = [
   { id: 'masculino', label: 'Masculino' },
@@ -12,6 +13,7 @@ const genders = [
 
 export default function GenderStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleSelect = (genderId: string) => {
@@ -21,7 +23,7 @@ export default function GenderStep() {
   const handleContinue = () => {
     if (answers.gender) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 

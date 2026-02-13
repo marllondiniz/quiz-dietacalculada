@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuizStore } from '@/store/quizStore';
 import SafeNavigationButton from '@/components/SafeNavigationButton';
+import { useQuizBasePath } from '@/hooks/useQuizBasePath';
 
 const obstacles = [
   { id: 'consistencia', label: 'Falta de consistência' },
@@ -14,6 +15,7 @@ const obstacles = [
 
 export default function ObstaclesStep() {
   const router = useRouter();
+  const basePath = useQuizBasePath();
   const { updateAnswer, nextStep, currentStep, answers } = useQuizStore();
 
   const handleToggle = (obstacleId: string) => {
@@ -27,7 +29,7 @@ export default function ObstaclesStep() {
   const handleContinue = () => {
     if (answers.obstacles && answers.obstacles.length > 0) {
       nextStep();
-      router.push(`/quiz/${currentStep + 1}`);
+      router.push(`${basePath}/${currentStep + 1}`);
     }
   };
 
